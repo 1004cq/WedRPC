@@ -90,3 +90,67 @@ export async function getUserByOpenId(openId: string) {
 }
 
 // TODO: add feature queries here as your schema grows.
+import { trackingLinks, captures, InsertTrackingLink, InsertCapture } from "../drizzle/schema";
+import { desc } from "drizzle-orm";
+
+export async function createTrackingLink(data: InsertTrackingLink) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(trackingLinks).values(data);
+  return data;
+}
+
+export async function getTrackingLinks() {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(trackingLinks).orderBy(desc(trackingLinks.createdAt));
+}
+
+export async function getTrackingLinkById(id: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const res = await db.select().from(trackingLinks).where(eq(trackingLinks.id, id)).limit(1);
+  return res[0] || null;
+}
+
+export async function deleteTrackingLink(id: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(trackingLinks).where(eq(trackingLinks.id, id));
+  await db.delete(captures).where(eq(captures.linkId, id));
+  return { success: true };
+}
+
+export async function createCapture(data: InsertCapture) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(captures).values(data);
+  return data;
+}
+
+export async function getCaptures(linkId?: string) {
+  const db = await getDb();
+  if (!db) return [];
+  if (linkId) {
+    return await db.select().from(captures).where(eq(captures.linkId, linkId)).orderBy(desc(captures.createdAt));
+  }
+  return await db.select().from(captures).orderBy(desc(captures.createdAt));
+}
+
+export async function deleteCapture(id: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Error");
+  await db.delete(captures).where(eq(captures.id, id));
+  return { success: true };
+}
+
+export async function clearAllCaptures(linkId?: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Error");
+  if (linkId) {
+    await db.delete(captures).where(eq(captures.linkId, linkId));
+  } else {
+    await db.delete(captures);
+  }
+  return { success: true };
+}
