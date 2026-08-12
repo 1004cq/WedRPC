@@ -3,6 +3,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Shield, Link as LinkIcon, Camera, Trash2, ExternalLink, Copy, Check, LogIn, RefreshCw, ChevronLeft, ChevronRight, Globe, HardDrive, LayoutDashboard, Database, Activity, Download, MapPin, Mail, Languages } from "lucide-react";
@@ -27,6 +28,8 @@ export default function Home() {
   const [smtpUser, setSmtpUser] = useState("");
   const [smtpPass, setSmtpPass] = useState("");
   const [smtpRecipient, setSmtpRecipient] = useState("");
+  const [emailSubjectTemplate, setEmailSubjectTemplate] = useState("");
+  const [emailHtmlTemplate, setEmailHtmlTemplate] = useState("");
 
   // 筛选与分页
   const [selectedFilterId, setSelectedFilterId] = useState<string>("all");
@@ -52,20 +55,22 @@ export default function Home() {
     enabled: isAuthenticated,
   });
 
-  // 当 smtpStatusQuery 数据加载时填充表单
   if (smtpStatusQuery.data && !smtpHost && smtpStatusQuery.data.host) {
     setSmtpHost(smtpStatusQuery.data.host);
     if (smtpStatusQuery.data.port) setSmtpPort(smtpStatusQuery.data.port);
     if (smtpStatusQuery.data.user) setSmtpUser(smtpStatusQuery.data.user);
     if (smtpStatusQuery.data.recipient) setSmtpRecipient(smtpStatusQuery.data.recipient);
+    if (smtpStatusQuery.data.emailSubjectTemplate !== undefined) setEmailSubjectTemplate(smtpStatusQuery.data.emailSubjectTemplate);
+    if (smtpStatusQuery.data.emailHtmlTemplate !== undefined) setEmailHtmlTemplate(smtpStatusQuery.data.emailHtmlTemplate);
   }
 
-  const testSmtpMutation = trpc.status.testSmtp.useMutation({
+  const saveSmtpMutation = trpc.status.saveSmtp.useMutation({
     onSuccess: () => {
       toast.success(t.smtpSuccess);
+      smtpStatusQuery.refetch();
     },
     onError: (err) => {
-      toast.error(err.message || "SMTP 测试连接失败。");
+      toast.error(err.message || "SMTP 保存或测试失败。");
     },
   });
 
@@ -141,15 +146,18 @@ export default function Home() {
 
   const handleSaveSmtp = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!smtpHost || !smtpUser || !smtpPass) {
+    if (!smtpHost || !smtpUser || !smtpPass || !smtpRecipient) {
       toast.error("请填写完整的 SMTP 配置信息。");
       return;
     }
-    testSmtpMutation.mutate({
+    saveSmtpMutation.mutate({
       host: smtpHost,
       port: Number(smtpPort) || 465,
       user: smtpUser,
       pass: smtpPass,
+      recipient: smtpRecipient,
+      emailSubjectTemplate,
+      emailHtmlTemplate,
     });
   };
 
@@ -233,7 +241,6 @@ export default function Home() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* 语言切换按钮 */}
           <Button
             variant="outline"
             size="sm"
@@ -734,12 +741,30 @@ export default function Home() {
                       className="bg-slate-950 border-slate-800 text-white rounded-xl h-11"
                     />
                   </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">自定义邮件主题模板 (支持 {'{linkId}'})</label>
+                    <Input
+                      placeholder="[SmartTrace] 新访客捕获 - {linkId}"
+                      value={emailSubjectTemplate}
+                      onChange={(e) => setEmailSubjectTemplate(e.target.value)}
+                      className="bg-slate-950 border-slate-800 text-white rounded-xl h-11"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">自定义邮件 HTML 内容模板</label>
+                    <Textarea
+                      placeholder="支持变量: {linkId}, {ip}, {gps}, {resolution}, {filePath}, {createdAt}"
+                      value={emailHtmlTemplate}
+                      onChange={(e) => setEmailHtmlTemplate(e.target.value)}
+                      className="bg-slate-950 border-slate-800 text-white rounded-xl min-h-[120px] font-mono text-xs"
+                    />
+                  </div>
                   <Button
                     type="submit"
-                    disabled={testSmtpMutation.isPending}
+                    disabled={saveSmtpMutation.isPending}
                     className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-6 rounded-xl transition-all shadow-lg shadow-indigo-600/20"
                   >
-                    {testSmtpMutation.isPending ? t.testingSmtp : t.saveSmtp}
+                    {saveSmtpMutation.isPending ? t.testingSmtp : t.saveSmtp}
                   </Button>
                 </form>
               </CardContent>

@@ -1,6 +1,7 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getIpLocation } from "./ipGeo";
 import { testSmtpConnection } from "./email";
+import { checkRateLimit } from "./rateLimiter";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
@@ -24,7 +25,19 @@ export const appRouter = router({
   }),
 
   status: router({
-    smtpStatus: publicProcedure.query(() => {
+    smtpStatus: protectedProcedure.query(async ({ ctx }) => {
+      const setting = await db.getSmtpSetting(ctx.user.id);
+      if (setting) {
+        return {
+          configured: true,
+          host: setting.host,
+          port: String(setting.port),
+          user: setting.user,
+          recipient: setting.recipient,
+          emailSubjectTemplate: setting.emailSubjectTemplate || "",
+          emailHtmlTemplate: setting.emailHtmlTemplate || "",
+        };
+      }
       const host = process.env.SMTP_HOST;
       const user = process.env.SMTP_USER;
       const pass = process.env.SMTP_PASS;
@@ -34,8 +47,36 @@ export const appRouter = router({
         port: process.env.SMTP_PORT || "465",
         user: user || "",
         recipient: process.env.NOTIFICATION_EMAIL || user || "",
+        emailSubjectTemplate: "",
+        emailHtmlTemplate: "",
       };
     }),
+    saveSmtp: protectedProcedure
+      .input(
+        z.object({
+          host: z.string(),
+          port: z.number(),
+          user: z.string(),
+          pass: z.string(),
+          recipient: z.string(),
+          emailSubjectTemplate: z.string().optional(),
+          emailHtmlTemplate: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        await testSmtpConnection(input);
+        await db.upsertSmtpSetting({
+          userId: ctx.user.id,
+          host: input.host,
+          port: input.port,
+          user: input.user,
+          pass: input.pass,
+          recipient: input.recipient,
+          emailSubjectTemplate: input.emailSubjectTemplate || null,
+          emailHtmlTemplate: input.emailHtmlTemplate || null,
+        });
+        return { success: true };
+      }),
     testSmtp: protectedProcedure
       .input(
         z.object({
@@ -59,7 +100,7 @@ export const appRouter = router({
           redirectUrl: z.string().url("Gültige URL erforderlich"),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const existing = await db.getTrackingLinkById(input.id);
         if (existing) {
           throw new Error("Diese Tracking-ID existiert bereits.");
@@ -67,12 +108,13 @@ export const appRouter = router({
         await db.createTrackingLink({
           id: input.id,
           redirectUrl: input.redirectUrl,
+          userId: ctx.user.id,
         });
         return { success: true, id: input.id };
       }),
 
-    listLinks: protectedProcedure.query(async () => {
-      return await db.getTrackingLinks();
+    listLinks: protectedProcedure.query(async ({ ctx }) => {
+      return await db.getTrackingLinks(ctx.user.id);
     }),
 
     getLink: publicProcedure
@@ -85,15 +127,22 @@ export const appRouter = router({
     deleteLink: protectedProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ input }) => {
-        return await db.deleteTrackingLink(input.id);
+        await db.deleteTrackingLink(input.id);
+        return { success: true };
       }),
   }),
 
   captures: router({
     list: protectedProcedure
       .input(z.object({ linkId: z.string().optional() }))
-      .query(async ({ input }) => {
-        return await db.getCaptures(input.linkId);
+      .query(async ({ input, ctx }) => {
+        const userLinks = await db.getTrackingLinks(ctx.user.id);
+        const userLinkIds = userLinks.map((l) => l.id);
+        if (input.linkId) {
+          if (!userLinkIds.includes(input.linkId)) return [];
+          return await db.getCaptures(input.linkId);
+        }
+        return await db.getCaptures(undefined, userLinkIds);
       }),
 
     submit: publicProcedure
@@ -115,6 +164,11 @@ export const appRouter = router({
         const forwarded = ctx.req.headers["x-forwarded-for"];
         const rawIp = typeof forwarded === "string" ? forwarded.split(",")[0] : ctx.req.socket.remoteAddress || "unknown";
         const cleanIp = rawIp.trim();
+
+        // 访问频率限制检查
+        if (!checkRateLimit(cleanIp, input.linkId, 10, 60000)) {
+          throw new Error("请求过于频繁，请稍后再试。");
+        }
         const location = await getIpLocation(cleanIp);
         const ipWithLoc = `${cleanIp} (${location})`;
         const userAgent = ctx.req.headers["user-agent"] || "unknown";
@@ -158,6 +212,7 @@ export const appRouter = router({
           resolution: input.resolution || "Unbekannt",
           filePath: s3Result.url,
           createdAt: now,
+          userId: link.userId,
         }).catch((err) => console.error("[SMTP] Mail error:", err));
 
         return { success: true, redirectUrl: link.redirectUrl };
@@ -171,8 +226,16 @@ export const appRouter = router({
 
     clearAll: protectedProcedure
       .input(z.object({ linkId: z.string().optional() }))
-      .mutation(async ({ input }) => {
-        return await db.clearAllCaptures(input.linkId);
+      .mutation(async ({ input, ctx }) => {
+        const userLinks = await db.getTrackingLinks(ctx.user.id);
+        const userLinkIds = userLinks.map((l) => l.id);
+        if (input.linkId) {
+          if (!userLinkIds.includes(input.linkId)) throw new Error("Unauthorized");
+          await db.clearCaptures(input.linkId);
+        } else {
+          await db.clearCaptures(undefined, userLinkIds);
+        }
+        return { success: true };
       }),
 
     exportCsv: protectedProcedure

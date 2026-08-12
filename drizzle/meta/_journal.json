@@ -15,6 +15,13 @@
       "when": 1786530957014,
       "tag": "0001_superb_the_fallen",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1786535367763,
+      "tag": "0002_sweet_mastermind",
+      "breakpoints": true
     }
   ]
 }
