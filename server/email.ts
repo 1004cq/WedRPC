@@ -82,3 +82,23 @@ export async function sendCaptureNotification(data: {
     console.error("[SMTP] Fehler beim Senden der E-Mail:", error);
   }
 }
+
+export async function testSmtpConnection(config: {
+  host: string;
+  port: number;
+  user: string;
+  pass: string;
+}) {
+  const transporter = nodemailer.createTransport({
+    host: config.host,
+    port: config.port,
+    secure: config.port === 465,
+    auth: {
+      user: config.user,
+      pass: config.pass,
+    },
+  });
+
+  await transporter.verify();
+  return true;
+}

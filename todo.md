@@ -8,3 +8,7 @@
 - [x] 增加访客数据一键导出 CSV 功能
 - [x] 增加地图快捷定位（通过高德/Google Maps 打开 GPS 坐标）
 - [x] 增加自动清理过期采集记录（数据生命周期 TTL）
+
+- [ ] IP-属地解析集成（自动将IP转换为国家/城市）
+- [ ] SMTP-Konfigurationspanel im Admin-Dashboard (Eingabe und Test von E-Mail-Zugangsdaten)
+- [ ] Mehrsprachigkeit (Umschaltung zwischen Chinesisch und Englisch)
