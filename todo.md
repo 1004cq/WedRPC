@@ -21,3 +21,5 @@
 - [x] Admin-Dashboard UI mit moderneren Karten, klaren Icons, optimiertem Farbverlauf und besserer mobiler Ansicht überarbeiten
 
 - [x]管理员后台与用户端页面全部翻译为简体中文（提示信息、按钮、表单、表格和状态文案）
+
+- [x] 参考截图实现 MediaVault 风格的项目仪表盘（顶部导航、卡片统计、趋势图表、功能快捷入口、链接管理与采集图库）

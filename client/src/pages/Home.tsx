@@ -4,20 +4,21 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Shield, Link as LinkIcon, Camera, Trash2, ExternalLink, Copy, Check, LogIn, RefreshCw, ChevronLeft, ChevronRight, Globe, HardDrive } from "lucide-react";
+import { Shield, Link as LinkIcon, Camera, Trash2, ExternalLink, Copy, Check, LogIn, RefreshCw, ChevronLeft, ChevronRight, Globe, HardDrive, LayoutDashboard, Database, Activity } from "lucide-react";
 import { toast } from "sonner";
 import { startLogin } from "@/const";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 export default function Home() {
   const { user, isAuthenticated, logout } = useAuth();
 
+  const [activeTab, setActiveTab] = useState<"dashboard" | "links" | "gallery">("dashboard");
   const [linkId, setLinkId] = useState("");
   const [redirectUrl, setRedirectUrl] = useState("https://example.com");
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // 筛选与分页状态
+  // 筛选与分页
   const [selectedFilterId, setSelectedFilterId] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 6;
@@ -93,6 +94,33 @@ export default function Home() {
   const totalLinks = linksQuery.data?.length || 0;
   const isSmtpConfigured = smtpStatusQuery.data?.configured ?? false;
 
+  // 动态生成真实最近 7-14 天的数据聚合
+  const getChartData = () => {
+    const countsMap: Record<string, number> = {};
+    const now = new Date();
+    // 初始化最近 10 天
+    for (let i = 9; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const key = `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      countsMap[key] = 0;
+    }
+
+    allCaptures.forEach((cap) => {
+      const capDate = new Date(cap.createdAt);
+      const key = `${String(capDate.getMonth() + 1).padStart(2, "0")}-${String(capDate.getDate()).padStart(2, "0")}`;
+      if (countsMap[key] !== undefined) {
+        countsMap[key] += 1;
+      } else {
+        countsMap[key] = 1;
+      }
+    });
+
+    return Object.entries(countsMap).map(([date, count]) => ({ date, count }));
+  };
+
+  const chartData = getChartData();
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 relative overflow-hidden font-sans">
@@ -126,79 +154,174 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      {/* 顶部导航 */}
-      <header className="border-b border-slate-800/80 bg-slate-900/70 backdrop-blur-xl sticky top-0 z-50 px-6 py-4 flex items-center justify-between shadow-sm">
+      {/* 顶部 MediaVault 风格品牌栏 */}
+      <header className="border-b border-slate-800/80 bg-slate-900/70 backdrop-blur-xl sticky top-0 z-50 px-4 md:px-6 py-3 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-md shadow-indigo-600/30">
+          <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-md shadow-indigo-600/30">
             <Shield className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-base font-bold tracking-tight text-white flex items-center gap-2">
-              智能追踪与媒体采集系统
-              <span className="text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full font-mono">Pro v2.0</span>
-            </h1>
-            <p className="text-xs text-slate-400">访客数据采集、SMTP 邮件通知与实时管理后台</p>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-white text-sm tracking-tight">SmartTrace</span>
+              <span className="text-xs text-slate-400 font-mono">MediaVault</span>
+            </div>
+            <p className="text-[11px] text-indigo-400 font-medium">项目仪表盘</p>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-300">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            当前用户：<strong className="text-indigo-400">{user?.name || user?.email}</strong>
-          </div>
-          <Button variant="outline" size="sm" onClick={() => logout()} className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl">
-            退出登录
+
+        {/* 顶部右侧状态与操作 */}
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-slate-300 hidden md:inline">
+            用户: <strong className="text-indigo-400">{user?.name || user?.email}</strong>
+          </span>
+          <Button variant="outline" size="sm" onClick={() => logout()} className="border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 rounded-xl text-xs h-8 px-3">
+            退出
           </Button>
         </div>
       </header>
 
-      {/* 主体内容 */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-6 space-y-8">
-        {/* 统计卡片 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-md flex items-center justify-between shadow-lg">
-            <div className="space-y-1">
-              <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">活跃追踪链接</p>
-              <p className="text-2xl font-bold text-white">{totalLinks}</p>
-            </div>
-            <div className="w-12 h-12 bg-indigo-600/20 border border-indigo-500/30 rounded-xl flex items-center justify-center text-indigo-400">
-              <Globe className="w-6 h-6" />
-            </div>
-          </div>
-          <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-md flex items-center justify-between shadow-lg">
-            <div className="space-y-1">
-              <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">已捕获记录</p>
-              <p className="text-2xl font-bold text-white">{allCaptures.length}</p>
-            </div>
-            <div className="w-12 h-12 bg-purple-600/20 border border-purple-500/30 rounded-xl flex items-center justify-center text-purple-400">
-              <Camera className="w-6 h-6" />
-            </div>
-          </div>
-          <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-md flex items-center justify-between shadow-lg">
-            <div className="space-y-1">
-              <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">SMTP 邮件通知</p>
-              <p className={`text-2xl font-bold ${isSmtpConfigured ? "text-emerald-400" : "text-amber-400"}`}>
-                {isSmtpConfigured ? "已启用" : "未配置"}
-              </p>
-            </div>
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${isSmtpConfigured ? "bg-emerald-600/20 border-emerald-500/30 text-emerald-400" : "bg-amber-600/20 border-amber-500/30 text-amber-400"}`}>
-              <HardDrive className="w-6 h-6" />
-            </div>
-          </div>
+      {/* 横向功能导航栏 (MediaVault 风格) */}
+      <nav className="bg-slate-900/40 border-b border-slate-800/80 px-4 md:px-6 overflow-x-auto">
+        <div className="max-w-7xl mx-auto flex items-center gap-1 py-2">
+          <button
+            onClick={() => setActiveTab("dashboard")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${
+              activeTab === "dashboard"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+            }`}
+          >
+            <LayoutDashboard className="w-4 h-4" /> 仪表盘
+          </button>
+          <button
+            onClick={() => setActiveTab("links")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${
+              activeTab === "links"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+            }`}
+          >
+            <Globe className="w-4 h-4" /> 链接管理 ({totalLinks})
+          </button>
+          <button
+            onClick={() => setActiveTab("gallery")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${
+              activeTab === "gallery"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+            }`}
+          >
+            <Camera className="w-4 h-4" /> 采集图库 ({allCaptures.length})
+          </button>
         </div>
+      </nav>
 
-        {/* 标签页 */}
-        <Tabs defaultValue="generator" className="space-y-6">
-          <TabsList className="bg-slate-900 border border-slate-800 p-1.5 rounded-2xl inline-flex gap-2">
-            <TabsTrigger value="generator" className="rounded-xl px-5 py-2.5 data-[state=active]:bg-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-indigo-600/30 text-slate-400 font-medium transition-all flex items-center gap-2">
-              <LinkIcon className="w-4 h-4" /> 链接生成与管理
-            </TabsTrigger>
-            <TabsTrigger value="gallery" className="rounded-xl px-5 py-2.5 data-[state=active]:bg-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-indigo-600/30 text-slate-400 font-medium transition-all flex items-center gap-2">
-              <Camera className="w-4 h-4" /> 采集图库 ({allCaptures.length})
-            </TabsTrigger>
-          </TabsList>
+      {/* 主体内容区 */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
+        {activeTab === "dashboard" && (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            {/* 统计卡片 (MediaVault 风格卡片布局) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-gradient-to-br from-slate-900 to-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl relative overflow-hidden">
+                <div className="absolute right-4 top-4 w-10 h-10 bg-indigo-600/10 rounded-xl flex items-center justify-center text-indigo-400 border border-indigo-500/20">
+                  <Database className="w-5 h-5" />
+                </div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">存储 / 活跃链接</p>
+                <p className="text-3xl font-extrabold text-white mt-2">{totalLinks} <span className="text-xs font-normal text-slate-400">个追踪路径</span></p>
+                <div className="mt-4 flex items-center gap-2 text-xs text-indigo-400">
+                  <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                  <span>系统运行正常</span>
+                </div>
+              </div>
 
-          {/* 生成器 Tab */}
-          <TabsContent value="generator" className="space-y-6">
+              <div className="bg-gradient-to-br from-slate-900 to-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl relative overflow-hidden">
+                <div className="absolute right-4 top-4 w-10 h-10 bg-purple-600/10 rounded-xl flex items-center justify-center text-purple-400 border border-purple-500/20">
+                  <Camera className="w-5 h-5" />
+                </div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">已捕获媒体与数据</p>
+                <p className="text-3xl font-extrabold text-white mt-2">{allCaptures.length} <span className="text-xs font-normal text-slate-400">条访问记录</span></p>
+                <div className="mt-4 flex items-center gap-2 text-xs text-purple-400">
+                  <span className="w-2 h-2 rounded-full bg-purple-500" />
+                  <span>包含 IP、GPS 及媒体文件</span>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-br from-slate-900 to-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl relative overflow-hidden">
+                <div className="absolute right-4 top-4 w-10 h-10 bg-emerald-600/10 rounded-xl flex items-center justify-center text-emerald-400 border border-emerald-500/20">
+                  <HardDrive className="w-5 h-5" />
+                </div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">SMTP 邮件推送状态</p>
+                <p className={`text-2xl font-extrabold mt-2 ${isSmtpConfigured ? "text-emerald-400" : "text-amber-400"}`}>
+                  {isSmtpConfigured ? "已启用通知" : "未配置服务器"}
+                </p>
+                <div className="mt-4 flex items-center gap-2 text-xs text-slate-400">
+                  <span>接收新访客即时提醒</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 远程快捷控制卡片 */}
+            <div className="bg-gradient-to-r from-slate-900 via-indigo-950/30 to-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="space-y-1 text-center md:text-left">
+                <div className="flex items-center justify-center md:justify-start gap-2 text-indigo-400 text-xs font-semibold uppercase tracking-wider">
+                  <Activity className="w-4 h-4" /> 快速操作中心
+                </div>
+                <h3 className="text-lg font-bold text-white">快速创建追踪链接或查看最新捕获</h3>
+                <p className="text-xs text-slate-400">为您的营销、活动或演示快速生成专属追踪 ID 并接收实时通知。</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Button onClick={() => setActiveTab("links")} className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-5 py-2.5 shadow-lg shadow-indigo-600/30 text-xs font-medium">
+                  管理追踪链接
+                </Button>
+                <Button onClick={() => setActiveTab("gallery")} variant="outline" className="border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 rounded-xl px-5 py-2.5 text-xs font-medium">
+                  查看采集图库
+                </Button>
+              </div>
+            </div>
+
+            {/* 活动趋势图 (真实聚合数据) */}
+            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-bold text-white">最近活动趋势</h3>
+                  <p className="text-xs text-slate-400">基于真实访问与采集记录的每日统计曲线</p>
+                </div>
+                <span className="text-xs bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2.5 py-1 rounded-lg font-mono">
+                  实时聚合
+                </span>
+              </div>
+              <div className="h-64 w-full pt-2">
+                {allCaptures.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-slate-500 text-xs space-y-2">
+                    <Activity className="w-8 h-8 opacity-30 text-indigo-400" />
+                    <p>暂无访问数据，趋势图将在有访客访问后自动生成。</p>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#6366f1" stopOpacity={0.5}/>
+                          <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                      <XAxis dataKey="date" stroke="#64748b" fontSize={11} tickLine={false} />
+                      <YAxis stroke="#64748b" fontSize={11} tickLine={false} allowDecimals={false} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "12px", color: "#fff", fontSize: "12px" }} 
+                      />
+                      <Area type="monotone" dataKey="count" stroke="#818cf8" strokeWidth={2.5} fillOpacity={1} fill="url(#colorCount)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "links" && (
+          <div className="space-y-6 animate-in fade-in duration-300">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* 创建表单 */}
               <Card className="bg-slate-900/60 border-slate-800 backdrop-blur-md lg:col-span-1 rounded-2xl shadow-xl">
@@ -310,10 +433,11 @@ export default function Home() {
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
+          </div>
+        )}
 
-          {/* 图库 Tab */}
-          <TabsContent value="gallery" className="space-y-6">
+        {activeTab === "gallery" && (
+          <div className="space-y-6 animate-in fade-in duration-300">
             <Card className="bg-slate-900/60 border-slate-800 backdrop-blur-md rounded-2xl shadow-xl">
               <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4">
                 <div>
@@ -452,8 +576,8 @@ export default function Home() {
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
-        </Tabs>
+          </div>
+        )}
       </main>
     </div>
   );
