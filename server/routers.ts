@@ -152,6 +152,26 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         return await db.clearAllCaptures(input.linkId);
       }),
+
+    exportCsv: protectedProcedure
+      .input(z.object({ linkId: z.string().optional() }))
+      .query(async ({ input }) => {
+        const list = await db.getCaptures(input.linkId);
+        const headers = ["ID", "Link-ID", "IP", "GPS", "Auflösung", "Fingerprint", "Datei-URL", "Erstellt am"];
+        const rows = list.map((c) => [
+          c.id,
+          c.linkId,
+          c.ip || "",
+          `"${(c.gps || "").replace(/"/g, '""')}"`,
+          c.resolution || "",
+          `"${(c.fingerprint || "").replace(/"/g, '""')}"`,
+          c.filePath,
+          new Date(c.createdAt).toISOString(),
+        ]);
+
+        const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+        return { csv: csvContent };
+      }),
   }),
 });
 

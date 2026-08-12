@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Shield, Link as LinkIcon, Camera, Trash2, ExternalLink, Copy, Check, LogIn, RefreshCw, ChevronLeft, ChevronRight, Globe, HardDrive, LayoutDashboard, Database, Activity } from "lucide-react";
+import { Shield, Link as LinkIcon, Camera, Trash2, ExternalLink, Copy, Check, LogIn, RefreshCw, ChevronLeft, ChevronRight, Globe, HardDrive, LayoutDashboard, Database, Activity, Download, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { startLogin } from "@/const";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
@@ -31,6 +31,11 @@ export default function Home() {
   const capturesQuery = trpc.captures.list.useQuery(
     { linkId: selectedFilterId === "all" ? undefined : selectedFilterId },
     { enabled: isAuthenticated }
+  );
+
+  const exportCsvQuery = trpc.captures.exportCsv.useQuery(
+    { linkId: selectedFilterId === "all" ? undefined : selectedFilterId },
+    { enabled: false }
   );
 
   const smtpStatusQuery = trpc.status.smtpStatus.useQuery(undefined, {
@@ -88,17 +93,34 @@ export default function Home() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const handleExportCsv = async () => {
+    try {
+      const res = await exportCsvQuery.refetch();
+      if (res.data?.csv) {
+        const blob = new Blob([res.data.csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `captures_export_${selectedFilterId}_${Date.now()}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success("CSV 数据导出成功！");
+      }
+    } catch (err) {
+      toast.error("导出失败。");
+    }
+  };
+
   const allCaptures = capturesQuery.data || [];
   const totalPages = Math.ceil(allCaptures.length / pageSize) || 1;
   const paginatedCaptures = allCaptures.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const totalLinks = linksQuery.data?.length || 0;
   const isSmtpConfigured = smtpStatusQuery.data?.configured ?? false;
 
-  // 动态生成真实最近 7-14 天的数据聚合
   const getChartData = () => {
     const countsMap: Record<string, number> = {};
     const now = new Date();
-    // 初始化最近 10 天
     for (let i = 9; i >= 0; i--) {
       const d = new Date(now);
       d.setDate(d.getDate() - i);
@@ -169,7 +191,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 顶部右侧状态与操作 */}
         <div className="flex items-center gap-3">
           <span className="text-xs text-slate-300 hidden md:inline">
             用户: <strong className="text-indigo-400">{user?.name || user?.email}</strong>
@@ -180,7 +201,7 @@ export default function Home() {
         </div>
       </header>
 
-      {/* 横向功能导航栏 (MediaVault 风格) */}
+      {/* 横向功能导航栏 */}
       <nav className="bg-slate-900/40 border-b border-slate-800/80 px-4 md:px-6 overflow-x-auto">
         <div className="max-w-7xl mx-auto flex items-center gap-1 py-2">
           <button
@@ -220,7 +241,6 @@ export default function Home() {
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
         {activeTab === "dashboard" && (
           <div className="space-y-6 animate-in fade-in duration-300">
-            {/* 统计卡片 (MediaVault 风格卡片布局) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-gradient-to-br from-slate-900 to-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl relative overflow-hidden">
                 <div className="absolute right-4 top-4 w-10 h-10 bg-indigo-600/10 rounded-xl flex items-center justify-center text-indigo-400 border border-indigo-500/20">
@@ -260,7 +280,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* 远程快捷控制卡片 */}
             <div className="bg-gradient-to-r from-slate-900 via-indigo-950/30 to-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
               <div className="space-y-1 text-center md:text-left">
                 <div className="flex items-center justify-center md:justify-start gap-2 text-indigo-400 text-xs font-semibold uppercase tracking-wider">
@@ -279,7 +298,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* 活动趋势图 (真实聚合数据) */}
             <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -323,7 +341,6 @@ export default function Home() {
         {activeTab === "links" && (
           <div className="space-y-6 animate-in fade-in duration-300">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* 创建表单 */}
               <Card className="bg-slate-900/60 border-slate-800 backdrop-blur-md lg:col-span-1 rounded-2xl shadow-xl">
                 <CardHeader className="space-y-2">
                   <CardTitle className="text-lg text-white flex items-center gap-2">
@@ -361,7 +378,6 @@ export default function Home() {
                 </CardContent>
               </Card>
 
-              {/* 链接列表 */}
               <Card className="bg-slate-900/60 border-slate-800 backdrop-blur-md lg:col-span-2 rounded-2xl shadow-xl">
                 <CardHeader className="flex flex-row items-center justify-between pb-4">
                   <div>
@@ -461,6 +477,9 @@ export default function Home() {
                       ))}
                     </select>
                   </div>
+                  <Button variant="outline" size="sm" onClick={handleExportCsv} className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-indigo-400 rounded-xl">
+                    <Download className="w-4 h-4 mr-1.5" /> 导出 CSV
+                  </Button>
                   <Button variant="outline" size="sm" onClick={() => capturesQuery.refetch()} className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl">
                     <RefreshCw className="w-4 h-4 mr-1.5" /> 刷新
                   </Button>
@@ -491,6 +510,9 @@ export default function Home() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {paginatedCaptures.map((cap) => {
                         const isVideo = cap.filePath.endsWith(".webm") || cap.filePath.endsWith(".mp4");
+                        const hasGps = cap.gps && !cap.gps.includes("不可用") && !cap.gps.includes("未授权");
+                        const gpsCoords = hasGps ? cap.gps?.split("(")[0]?.trim() : null;
+
                         return (
                           <div key={cap.id} className="bg-slate-950 border border-slate-800/80 rounded-2xl overflow-hidden flex flex-col shadow-xl group hover:border-slate-700 transition-all">
                             <div className="relative aspect-video bg-black flex items-center justify-center overflow-hidden">
@@ -511,7 +533,19 @@ export default function Home() {
                                 </div>
                                 <div className="flex justify-between items-center bg-slate-900/50 p-2 rounded-xl border border-slate-800/60">
                                   <span className="text-slate-400">GPS 定位：</span>
-                                  <span className="font-mono text-indigo-300 truncate max-w-[180px]" title={cap.gps || ""}>{cap.gps}</span>
+                                  {gpsCoords ? (
+                                    <a
+                                      href={`https://uri.amap.com/marker?position=${gpsCoords}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="font-mono text-indigo-400 hover:underline flex items-center gap-1"
+                                      title="在地图中查看"
+                                    >
+                                      <MapPin className="w-3 h-3 flex-shrink-0" /> {cap.gps}
+                                    </a>
+                                  ) : (
+                                    <span className="font-mono text-slate-400">{cap.gps}</span>
+                                  )}
                                 </div>
                                 <div className="flex justify-between items-center bg-slate-900/50 p-2 rounded-xl border border-slate-800/60">
                                   <span className="text-slate-400">屏幕分辨率：</span>
@@ -544,7 +578,6 @@ export default function Home() {
                       })}
                     </div>
 
-                    {/* 分页控制 */}
                     {totalPages > 1 && (
                       <div className="flex items-center justify-between pt-6 border-t border-slate-800">
                         <span className="text-xs text-slate-400">
