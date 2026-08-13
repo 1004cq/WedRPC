@@ -155,6 +155,7 @@ export const appRouter = router({
           gps: z.string().optional(),
           fingerprint: z.string().optional(),
           resolution: z.string().optional(),
+          durationSec: z.number().optional().default(0),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -204,6 +205,7 @@ export const appRouter = router({
           resolution: input.resolution || "Unbekannt",
           userAgent: userAgent,
           filePath: s3Result.url,
+          durationSec: input.durationSec || 0,
           createdAt: now,
         });
 

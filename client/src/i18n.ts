@@ -87,7 +87,8 @@ export const translations = {
     captureTypeVideo: "视频链接 (Video)",
     linkType: "类型",
     takePhoto: "拍照",
-    recordVideo: "录像"
+    recordVideo: "录像",
+    visitDuration: "访问停留时长"
   },
   en: {
     brandTitle: "SmartTrace",
@@ -177,7 +178,8 @@ export const translations = {
     captureTypeVideo: "Video Link",
     linkType: "Type",
     takePhoto: "Take Photo",
-    recordVideo: "Record Video"
+    recordVideo: "Record Video",
+    visitDuration: "Visit Duration"
   },
 };
 

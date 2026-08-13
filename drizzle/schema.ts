@@ -22,7 +22,7 @@ export const trackingLinks = mysqlTable("trackingLinks", {
   id: varchar("id", { length: 64 }).primaryKey(),
   redirectUrl: text("redirectUrl").notNull(),
   userId: int("userId"),
-  captureType: varchar("captureType", { length: 32 }).default("photo").notNull(), // 'photo' 或 'video'
+  captureType: varchar("captureType", { length: 32 }).default("photo").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -35,6 +35,7 @@ export const captures = mysqlTable("captures", {
   resolution: varchar("resolution", { length: 64 }),
   userAgent: text("userAgent"),
   filePath: text("filePath").notNull(),
+  durationSec: int("durationSec").default(0).notNull(), // 访问停留时长（秒）
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

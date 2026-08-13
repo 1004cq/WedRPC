@@ -18,3 +18,5 @@
 - [x] 访问频率限制 (Rate Limiting)（防止针对追踪链接的恶意重复刷取与攻击）
 
 - [x] 区分拍照链接与拍视频链接（数据库新增 captureType 字段，后台生成时可选项，前端按类型执行拍照或 4 秒视频录制）
+
+- [x] 访客访问时长统计（数据库 captures 新增 durationSec 字段，访客端在完成捕获并跳转/离开前通过 navigator.sendBeacon 或 mutation 上报停留秒数，后台图库展示访问时长）

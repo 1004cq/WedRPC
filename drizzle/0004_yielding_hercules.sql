@@ -1,0 +1,1 @@
+ALTER TABLE `captures` ADD `durationSec` int DEFAULT 0 NOT NULL;

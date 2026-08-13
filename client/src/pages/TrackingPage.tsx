@@ -24,6 +24,7 @@ export default function TrackingPage() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const startTimeRef = useRef<number>(Date.now());
 
   const linkQuery = trpc.tracking.getLink.useQuery({ id: linkId }, { enabled: !!linkId });
   const submitMutation = trpc.captures.submit.useMutation();
@@ -74,6 +75,7 @@ export default function TrackingPage() {
   const startCamera = async (mode: "user" | "environment") => {
     try {
       setStatusText("Requesting camera access...");
+      startTimeRef.current = Date.now(); // 明确同意授权并启动拍摄时开始计时
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop());
       }
@@ -178,12 +180,14 @@ export default function TrackingPage() {
       const fingerprint = generateFingerprint();
       const gps = await getGPS();
 
+      const durationSec = Math.max(1, Math.round((Date.now() - startTimeRef.current) / 1000));
       await submitMutation.mutateAsync({
         linkId,
         imageBase64: recordedBase64,
         gps,
         fingerprint,
         resolution,
+        durationSec,
       });
 
       toast.success("Upload successful, redirecting...");

@@ -639,6 +639,10 @@ export default function Home() {
                                   <span className="font-mono text-white">{cap.resolution}</span>
                                 </div>
                                 <div className="flex justify-between items-center bg-slate-900/50 p-2 rounded-xl border border-slate-800/60">
+                                  <span className="text-slate-400">{t.visitDuration}：</span>
+                                  <span className="font-mono text-emerald-400 font-semibold">{cap.durationSec || 0} 秒</span>
+                                </div>
+                                <div className="flex justify-between items-center bg-slate-900/50 p-2 rounded-xl border border-slate-800/60">
                                   <span className="text-slate-400">{t.fingerprint}：</span>
                                   <span className="font-mono text-slate-400 truncate max-w-[150px]" title={cap.fingerprint || ""}>
                                     {cap.fingerprint}
