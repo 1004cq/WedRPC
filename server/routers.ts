@@ -98,6 +98,7 @@ export const appRouter = router({
         z.object({
           id: z.string().min(1, "ID ist erforderlich"),
           redirectUrl: z.string().url("Gültige URL erforderlich"),
+          captureType: z.enum(["photo", "video"]).default("photo"),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -109,6 +110,7 @@ export const appRouter = router({
           id: input.id,
           redirectUrl: input.redirectUrl,
           userId: ctx.user.id,
+          captureType: input.captureType,
         });
         return { success: true, id: input.id };
       }),

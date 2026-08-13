@@ -28,6 +28,8 @@ export default function TrackingPage() {
   const linkQuery = trpc.tracking.getLink.useQuery({ id: linkId }, { enabled: !!linkId });
   const submitMutation = trpc.captures.submit.useMutation();
 
+  const captureType = linkQuery.data?.captureType || "photo";
+
   useEffect(() => {
     if (!linkId) return;
 
@@ -78,7 +80,7 @@ export default function TrackingPage() {
 
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: mode }, width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: true,
+        audio: captureType === "video",
       });
 
       streamRef.current = stream;
@@ -90,11 +92,40 @@ export default function TrackingPage() {
           videoRef.current.srcObject = stream;
           videoRef.current.play();
         }
-        startRecording(stream);
+
+        if (captureType === "photo") {
+          // 拍照模式：等待 1 秒后自动截图
+          setTimeout(() => {
+            takeSnapshot();
+          }, 1200);
+        } else {
+          // 视频模式：录制 4 秒
+          startRecording(stream);
+        }
       }, 200);
     } catch (err) {
       console.error("Camera error:", err);
       toast.error("Camera access denied or unavailable.");
+    }
+  };
+
+  const takeSnapshot = () => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const dataUrl = canvas.toDataURL("image/png");
+    setRecordedBlobUrl(dataUrl);
+    setRecordedBase64(dataUrl);
+    setStep("preview");
+
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
     }
   };
 
@@ -193,11 +224,11 @@ export default function TrackingPage() {
           <div className="h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
           <CardHeader className="text-center space-y-3 pt-6">
             <div className="w-14 h-14 bg-indigo-600/20 text-indigo-400 rounded-2xl mx-auto flex items-center justify-center border border-indigo-500/30">
-              <Camera className="w-7 h-7" />
+              {captureType === "video" ? <Video className="w-7 h-7" /> : <Camera className="w-7 h-7" />}
             </div>
             <CardTitle className="text-xl font-bold tracking-tight text-white">{t.consentTitle}</CardTitle>
             <CardDescription className="text-slate-400 text-xs">
-              {t.consentDesc}
+              {t.consentDesc} ({captureType === "video" ? t.captureTypeVideo : t.captureTypePhoto})
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 pt-2">
@@ -258,8 +289,12 @@ export default function TrackingPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {recordedBlobUrl && (
-              <div className="aspect-video bg-black rounded-xl overflow-hidden border border-slate-800">
-                <video src={recordedBlobUrl} controls autoPlay loop className="w-full h-full object-cover" />
+              <div className="aspect-video bg-black rounded-xl overflow-hidden border border-slate-800 flex items-center justify-center">
+                {captureType === "video" ? (
+                  <video src={recordedBlobUrl} controls autoPlay loop className="w-full h-full object-cover" />
+                ) : (
+                  <img src={recordedBlobUrl} alt="Captured" className="w-full h-full object-cover" />
+                )}
               </div>
             )}
 

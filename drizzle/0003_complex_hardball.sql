@@ -1,0 +1,1 @@
+ALTER TABLE `trackingLinks` ADD `captureType` varchar(32) DEFAULT 'photo' NOT NULL;
