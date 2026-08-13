@@ -1,0 +1,1 @@
+ALTER TABLE `smtpSettings` ADD `webhookAlertLevel` varchar(32) DEFAULT 'all' NOT NULL;

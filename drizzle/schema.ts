@@ -51,7 +51,8 @@ export const smtpSettings = mysqlTable("smtpSettings", {
   emailHtmlTemplate: text("emailHtmlTemplate"),
   webhookUrl: text("webhookUrl"),
   webhookType: varchar("webhookType", { length: 32 }).default("dingtalk"),
-  webhookTemplate: text("webhookTemplate"), // 自定义 Webhook 消息模板
+  webhookTemplate: text("webhookTemplate"),
+  webhookAlertLevel: varchar("webhookAlertLevel", { length: 32 }).default("all").notNull(), // all, high
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

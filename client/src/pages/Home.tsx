@@ -55,6 +55,11 @@ export default function Home() {
     { enabled: false }
   );
 
+  const exportXlsxQuery = trpc.captures.exportXlsx.useQuery(
+    { linkId: selectedFilterId === "all" ? undefined : selectedFilterId },
+    { enabled: false }
+  );
+
   const smtpStatusQuery = trpc.status.smtpStatus.useQuery(undefined, {
     enabled: isAuthenticated,
   });
@@ -144,10 +149,35 @@ export default function Home() {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        toast.success("CSV 数据导出成功！");
+        toast.success("CSV 导出成功！");
       }
-    } catch (err) {
-      toast.error("导出失败。");
+    } catch (e) {
+      toast.error("导出 CSV 失败。");
+    }
+  };
+
+  const handleExportXlsx = async () => {
+    try {
+      const res = await exportXlsxQuery.refetch();
+      if (res.data?.base64) {
+        const byteCharacters = atob(res.data.base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", res.data.filename || `captures_${Date.now()}.xlsx`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success("Excel 报表导出成功！");
+      }
+    } catch (e) {
+      toast.error("导出 Excel 失败。");
     }
   };
 
@@ -589,6 +619,9 @@ export default function Home() {
                   </div>
                   <Button variant="outline" size="sm" onClick={handleExportCsv} className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-indigo-400 rounded-xl">
                     <Download className="w-4 h-4 mr-1.5" /> {t.exportCsv}
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleExportXlsx} className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-emerald-400 rounded-xl">
+                    <Download className="w-4 h-4 mr-1.5" /> 导出 Excel
                   </Button>
                   <Button variant="outline" size="sm" onClick={() => capturesQuery.refetch()} className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl">
                     <RefreshCw className="w-4 h-4 mr-1.5" /> {t.refresh}

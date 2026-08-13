@@ -9,6 +9,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
+import * as XLSX from "xlsx";
 import * as db from "./db";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
@@ -159,7 +160,7 @@ export const appRouter = router({
       .query(async ({ input, ctx }) => {
         const userLinks = await db.getTrackingLinks(ctx.user.id);
         const userLinkIds = userLinks.map((l) => l.id);
-        let list = [];
+        let list: Awaited<ReturnType<typeof db.getCaptures>> = [];
         if (input.linkId) {
           if (!userLinkIds.includes(input.linkId)) return [];
           list = await db.getCaptures(input.linkId);
@@ -283,22 +284,65 @@ export const appRouter = router({
 
     exportCsv: protectedProcedure
       .input(z.object({ linkId: z.string().optional() }))
-      .query(async ({ input }) => {
-        const list = await db.getCaptures(input.linkId);
-        const headers = ["ID", "Link-ID", "IP", "GPS", "Auflösung", "Fingerprint", "Datei-URL", "Erstellt am"];
+      .query(async ({ input, ctx }) => {
+        const userLinks = await db.getTrackingLinks(ctx.user.id);
+        const userLinkIds = userLinks.map((l) => l.id);
+        let list: Awaited<ReturnType<typeof db.getCaptures>> = [];
+        if (input.linkId) {
+          if (!userLinkIds.includes(input.linkId)) list = [];
+          else list = await db.getCaptures(input.linkId);
+        } else {
+          list = await db.getCaptures(undefined, userLinkIds);
+        }
+        const headers = ["ID", "Link-ID", "IP", "GPS", "Auflösung", "Fingerprint", "文件地址", "访问时长(秒)", "创建时间"];
         const rows = list.map((c) => [
           c.id,
           c.linkId,
           c.ip || "",
-          `"${(c.gps || "").replace(/"/g, '""')}"`,
+          `"${decrypt(c.gps || "").replace(/"/g, '""')}"`,
           c.resolution || "",
-          `"${(c.fingerprint || "").replace(/"/g, '""')}"`,
+          `"${decrypt(c.fingerprint || "").replace(/"/g, '""')}"`,
           c.filePath,
-          new Date(c.createdAt).toISOString(),
+          c.durationSec || 0,
+          new Date(c.createdAt).toLocaleString(),
         ]);
 
         const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+        await logAudit(ctx.user.id, "EXPORT_CSV", `Exported CSV records for linkId: ${input.linkId || 'all'}`, ctx.req.socket.remoteAddress);
         return { csv: csvContent };
+      }),
+
+    exportXlsx: protectedProcedure
+      .input(z.object({ linkId: z.string().optional() }))
+      .query(async ({ input, ctx }) => {
+        const userLinks = await db.getTrackingLinks(ctx.user.id);
+        const userLinkIds = userLinks.map((l) => l.id);
+        let list: Awaited<ReturnType<typeof db.getCaptures>> = [];
+        if (input.linkId) {
+          if (!userLinkIds.includes(input.linkId)) list = [];
+          else list = await db.getCaptures(input.linkId);
+        } else {
+          list = await db.getCaptures(undefined, userLinkIds);
+        }
+        const data = list.map((c) => ({
+          ID: c.id,
+          "Link ID": c.linkId,
+          "IP 地址": c.ip || "",
+          "GPS 定位": decrypt(c.gps || ""),
+          "分辨率": c.resolution || "",
+          "设备指纹": decrypt(c.fingerprint || ""),
+          "文件地址": c.filePath,
+          "访问时长(秒)": c.durationSec || 0,
+          "创建时间": new Date(c.createdAt).toLocaleString(),
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(data);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Captures");
+        const base64 = XLSX.write(workbook, { type: "base64", bookType: "xlsx" });
+
+        await logAudit(ctx.user.id, "EXPORT_XLSX", `Exported XLSX records for linkId: ${input.linkId || 'all'}`, ctx.req.socket.remoteAddress);
+        return { base64, filename: `captures_${Date.now()}.xlsx` };
       }),
   }),
 });

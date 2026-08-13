@@ -50,6 +50,13 @@
       "when": 1786586878129,
       "tag": "0006_rapid_micromacro",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1786587211985,
+      "tag": "0007_wooden_cerebro",
+      "breakpoints": true
     }
   ]
 }
