@@ -33,6 +33,16 @@ describe("request IP normalization", () => {
     expect(result.ip).toBe("198.51.100.8");
     expect(result.source).toBe("socket");
   });
+
+  it("trusts a public proxy only when explicitly listed", () => {
+    const request = {
+      headers: { "x-forwarded-for": "203.0.113.10" },
+      socket: { remoteAddress: "198.51.100.8" },
+    } as any;
+    const result = parseRequestIp(request, "198.51.100.8");
+    expect(result.ip).toBe("203.0.113.10");
+    expect(result.source).toBe("x-forwarded-for");
+  });
 });
 
 describe("risk rules", () => {

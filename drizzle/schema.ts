@@ -62,6 +62,12 @@ export const smtpSettings = mysqlTable("smtpSettings", {
   webhookType: varchar("webhookType", { length: 32 }).default("dingtalk"),
   webhookTemplate: text("webhookTemplate"),
   webhookAlertLevel: varchar("webhookAlertLevel", { length: 32 }).default("all").notNull(), // all, high
+  trustedProxyIps: text("trustedProxyIps"),
+  smtpTestedAt: timestamp("smtpTestedAt"),
+  smtpTestResult: varchar("smtpTestResult", { length: 32 }),
+  webhookLastSentAt: timestamp("webhookLastSentAt"),
+  webhookLastResult: varchar("webhookLastResult", { length: 32 }),
+  webhookLastError: text("webhookLastError"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

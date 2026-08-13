@@ -167,8 +167,32 @@ export async function upsertSmtpSetting(data: InsertSmtpSetting) {
       webhookType: data.webhookType,
       webhookTemplate: data.webhookTemplate,
       webhookAlertLevel: data.webhookAlertLevel,
+      trustedProxyIps: data.trustedProxyIps,
+      smtpTestedAt: data.smtpTestedAt,
+      smtpTestResult: data.smtpTestResult,
+      webhookLastSentAt: data.webhookLastSentAt,
+      webhookLastResult: data.webhookLastResult,
+      webhookLastError: data.webhookLastError,
     },
   });
+}
+
+export async function listUsers() {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select({ id: users.id, openId: users.openId, name: users.name, email: users.email, role: users.role, createdAt: users.createdAt, lastSignedIn: users.lastSignedIn }).from(users).orderBy(desc(users.createdAt));
+}
+
+export async function updateUserRole(userId: number, role: "admin" | "auditor" | "operator" | "viewer" | "user") {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(users).set({ role, updatedAt: new Date() }).where(eq(users.id, userId));
+}
+
+export async function updateSmtpStatus(userId: number, status: { smtpTestedAt?: Date; smtpTestResult?: string; webhookLastSentAt?: Date; webhookLastResult?: string; webhookLastError?: string | null }) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(smtpSettings).set(status).where(eq(smtpSettings.userId, userId));
 }
 
 export async function getAuditLogs(userId?: number) {

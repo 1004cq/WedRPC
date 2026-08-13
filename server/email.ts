@@ -1,5 +1,5 @@
 import nodemailer from "nodemailer";
-import { getSmtpSetting } from "./db";
+import { getSmtpSetting, updateSmtpStatus } from "./db";
 
 export async function sendCaptureNotification(data: {
   linkId: string;
@@ -33,8 +33,11 @@ export async function sendCaptureNotification(data: {
 
   if (!host || !user || !pass) {
     console.warn("[SMTP] SMTP not configured. Skipping email notification.");
-    return;
+    if (data.userId) await updateSmtpStatus(data.userId, { smtpTestResult: "not_configured", smtpTestedAt: new Date() }).catch(() => undefined);
+    return { sent: false, result: "not_configured" as const };
   }
+
+  const safeRecipient = recipient || user || "unknown";
 
   try {
     const transporter = nodemailer.createTransport({
@@ -102,15 +105,20 @@ export async function sendCaptureNotification(data: {
 
     const mailOptions = {
       from: `"SmartTrace Vault" <${user}>`,
-      to: recipient,
+      to: safeRecipient,
       subject,
       html,
     };
 
     await transporter.sendMail(mailOptions);
-    console.log(`[SMTP] Notification sent successfully to ${recipient}`);
+    console.log(JSON.stringify({ event: "smtp.sent", recipient: safeRecipient.replace(/(.{2}).*(@.*)/, "$1***$2") }));
+    if (data.userId) await updateSmtpStatus(data.userId, { smtpTestResult: "sent", smtpTestedAt: new Date() }).catch(() => undefined);
+    return { sent: true, result: "sent" as const };
   } catch (error) {
-    console.error("[SMTP] Failed to send notification email:", error);
+    const safeError = error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300);
+    console.error(JSON.stringify({ event: "smtp.failed", error: safeError }));
+    if (data.userId) await updateSmtpStatus(data.userId, { smtpTestResult: "failed", smtpTestedAt: new Date() }).catch(() => undefined);
+    return { sent: false, result: "failed" as const, error: safeError };
   }
 }
 

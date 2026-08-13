@@ -59,6 +59,12 @@ export const appRouter = router({
           webhookType: setting.webhookType || "dingtalk",
           webhookTemplate: setting.webhookTemplate || "",
           webhookAlertLevel: setting.webhookAlertLevel || "all",
+          trustedProxyIps: setting.trustedProxyIps || "",
+          smtpTestedAt: setting.smtpTestedAt,
+          smtpTestResult: setting.smtpTestResult || "not_tested",
+          webhookLastSentAt: setting.webhookLastSentAt,
+          webhookLastResult: setting.webhookLastResult || "not_sent",
+          webhookLastError: setting.webhookLastError || "",
         };
       }
       const host = process.env.SMTP_HOST;
@@ -74,8 +80,14 @@ export const appRouter = router({
         emailHtmlTemplate: "",
         webhookUrl: "",
         webhookType: "dingtalk",
-        webhookTemplate: "",
-      };
+          webhookTemplate: "",
+          trustedProxyIps: process.env.TRUSTED_PROXY_IPS || "",
+          smtpTestedAt: null,
+          smtpTestResult: "not_tested",
+          webhookLastSentAt: null,
+          webhookLastResult: "not_sent",
+          webhookLastError: "",
+        };
     }),
     saveSmtp: permissionProcedure("manage_settings")
       .input(
@@ -91,6 +103,7 @@ export const appRouter = router({
           webhookType: z.enum(["dingtalk", "wechat", "telegram"]).optional(),
           webhookTemplate: z.string().optional(),
           webhookAlertLevel: z.enum(["all", "high"]).default("all"),
+          trustedProxyIps: z.string().max(4000).default(""),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -108,6 +121,9 @@ export const appRouter = router({
           webhookType: input.webhookType || "dingtalk",
           webhookTemplate: input.webhookTemplate || null,
           webhookAlertLevel: input.webhookAlertLevel,
+          trustedProxyIps: input.trustedProxyIps || null,
+          smtpTestedAt: new Date(),
+          smtpTestResult: "passed",
         });
         await logAudit(ctx.user.id, "SAVE_SMTP_WEBHOOK", "Updated SMTP/Webhook settings", ctx.req.socket.remoteAddress, { targetType: "settings", targetId: "smtp-webhook", userAgent: String(ctx.req.headers["user-agent"] || "unknown") });
         return { success: true };
@@ -118,16 +134,44 @@ export const appRouter = router({
     testSmtp: permissionProcedure("manage_settings")
       .input(
         z.object({
-          host: z.string(),
-          port: z.number(),
-          user: z.string(),
-          pass: z.string(),
+          host: z.string().trim().min(1).max(255),
+          port: z.number().int().min(1).max(65535),
+          user: z.string().trim().min(1).max(255),
+          pass: z.string().min(1).max(255),
         })
       )
-      .mutation(async ({ input }) => {
-        await testSmtpConnection(input);
-        return { success: true };
+      .mutation(async ({ input, ctx }) => {
+        try {
+          await testSmtpConnection(input);
+          await db.updateSmtpStatus(ctx.user.id, { smtpTestedAt: new Date(), smtpTestResult: "passed" }).catch(() => undefined);
+          await logAudit(ctx.user.id, "TEST_SMTP", "SMTP verification passed", ctx.req.socket.remoteAddress, { targetType: "settings", targetId: "smtp", userAgent: String(ctx.req.headers["user-agent"] || "unknown") });
+          return { success: true, result: "passed" as const };
+        } catch (error) {
+          const reason = error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300);
+          await db.updateSmtpStatus(ctx.user.id, { smtpTestedAt: new Date(), smtpTestResult: "failed" }).catch(() => undefined);
+          await logAudit(ctx.user.id, "TEST_SMTP", JSON.stringify({ result: "failed", reason }), ctx.req.socket.remoteAddress, { targetType: "settings", targetId: "smtp", result: "failure", userAgent: String(ctx.req.headers["user-agent"] || "unknown") });
+          return { success: false, result: "failed" as const, error: reason };
+        }
       }),
+    testWebhook: permissionProcedure("manage_settings")
+      .mutation(async ({ ctx }) => {
+        const result = await sendWebhookNotification({ linkId: "test", ip: "test", gps: "已隐藏", resolution: "test", filePath: "visit-only", createdAt: new Date(), userId: ctx.user.id, riskFlags: "authorization_incomplete", collectionMode: "visit" });
+        await logAudit(ctx.user.id, "TEST_WEBHOOK", JSON.stringify(result), ctx.req.socket.remoteAddress, { targetType: "settings", targetId: "webhook", result: result.sent || result.result === "skipped_high" ? "success" : "failure", userAgent: String(ctx.req.headers["user-agent"] || "unknown") });
+        return result;
+      }),
+    users: router({
+      list: adminProcedure.query(async () => db.listUsers()),
+      updateRole: adminProcedure
+        .input(z.object({ userId: z.number().int().positive(), role: z.enum(["admin", "auditor", "operator", "viewer", "user"]) }))
+        .mutation(async ({ input, ctx }) => {
+          if (input.userId === ctx.user.id && input.role !== "admin") {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "不能直接降级当前登录管理员，请先由另一位管理员操作。" });
+          }
+          await db.updateUserRole(input.userId, input.role);
+          await logAudit(ctx.user.id, "UPDATE_USER_ROLE", JSON.stringify({ userId: input.userId, role: input.role }), ctx.req.socket.remoteAddress, { targetType: "user", targetId: String(input.userId), userAgent: String(ctx.req.headers["user-agent"] || "unknown") });
+          return { success: true };
+        }),
+    }),
   }),
 
   tracking: router({
@@ -217,7 +261,8 @@ export const appRouter = router({
           throw new Error("Tracking link not found");
         }
 
-        const normalizedIp = parseRequestIp(ctx.req);
+        const ownerSettings = link.userId ? await db.getSmtpSetting(link.userId) : undefined;
+        const normalizedIp = parseRequestIp(ctx.req, ownerSettings?.trustedProxyIps || undefined);
         const cleanIp = normalizedIp.ip;
 
         // 访问频率限制检查：使用规范化 IP，降低代理链绕过风险

@@ -4,10 +4,11 @@ const mocks = vi.hoisted(() => ({
   post: vi.fn().mockResolvedValue({ status: 200 }),
   get: vi.fn().mockResolvedValue({ status: 200 }),
   getSmtpSetting: vi.fn(),
+  updateSmtpStatus: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("axios", () => ({ default: { post: mocks.post, get: mocks.get } }));
-vi.mock("./db", () => ({ getSmtpSetting: mocks.getSmtpSetting }));
+vi.mock("./db", () => ({ getSmtpSetting: mocks.getSmtpSetting, updateSmtpStatus: mocks.updateSmtpStatus }));
 
 import { sendWebhookNotification } from "./webhook";
 
@@ -16,6 +17,7 @@ describe("Webhook notifications", () => {
     mocks.post.mockClear();
     mocks.get.mockClear();
     mocks.getSmtpSetting.mockReset();
+    mocks.updateSmtpStatus.mockClear();
   });
 
   it("does not send low-risk events in high alert mode", async () => {

@@ -1,5 +1,5 @@
 import axios from "axios";
-import { getSmtpSetting } from "./db";
+import { getSmtpSetting, updateSmtpStatus } from "./db";
 import { isHighRisk } from "./risk";
 
 function maskWebhookUrl(value: string): string {
@@ -30,14 +30,15 @@ export async function sendWebhookNotification(data: {
   riskFlags?: string;
   collectionMode?: string;
 }) {
-  if (!data.userId) return;
+  if (!data.userId) return { sent: false, result: "no_user" as const };
   const setting = await getSmtpSetting(data.userId);
-  if (!setting || !setting.webhookUrl) return;
+  if (!setting || !setting.webhookUrl) return { sent: false, result: "not_configured" as const };
 
   const { webhookUrl, webhookType, webhookTemplate, webhookAlertLevel } = setting;
 
   if (webhookAlertLevel === "high" && !isHighRisk(data.riskFlags?.split(","))) {
-    return;
+    await updateSmtpStatus(data.userId, { webhookLastSentAt: new Date(), webhookLastResult: "skipped_high", webhookLastError: null }).catch(() => undefined);
+    return { sent: false, result: "skipped_high" as const };
   }
   
   let text = webhookTemplate || `🚨 [SmartTrace 访客提醒]
@@ -78,7 +79,12 @@ export async function sendWebhookNotification(data: {
       await axios.post(webhookUrl, { content: text }, { timeout: 5000 });
     }
     console.log(JSON.stringify({ event: "webhook.sent", type: webhookType, endpoint: maskWebhookUrl(webhookUrl), riskFlags: data.riskFlags || "none" }));
+    await updateSmtpStatus(data.userId, { webhookLastSentAt: new Date(), webhookLastResult: "sent", webhookLastError: null }).catch(() => undefined);
+    return { sent: true, result: "sent" as const };
   } catch (error) {
-    console.error(JSON.stringify({ event: "webhook.failed", type: webhookType, endpoint: maskWebhookUrl(webhookUrl), error: sanitizeError(error) }));
+    const safeError = sanitizeError(error);
+    console.error(JSON.stringify({ event: "webhook.failed", type: webhookType, endpoint: maskWebhookUrl(webhookUrl), error: safeError }));
+    await updateSmtpStatus(data.userId, { webhookLastSentAt: new Date(), webhookLastResult: "failed", webhookLastError: safeError }).catch(() => undefined);
+    return { sent: false, result: "failed" as const, error: safeError };
   }
 }
