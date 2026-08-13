@@ -16,6 +16,9 @@ export default function TrackingPage() {
 
   const [step, setStep] = useState<"loading" | "consent" | "recording" | "preview" | "submitting">("loading");
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const [consentMedia, setConsentMedia] = useState(true);
+  const [consentGps, setConsentGps] = useState(true);
+  const [consentFingerprint, setConsentFingerprint] = useState(true);
   const [statusText, setStatusText] = useState(t.verifyingLink);
   const [recordedBlobUrl, setRecordedBlobUrl] = useState<string | null>(null);
   const [recordedBase64, setRecordedBase64] = useState<string | null>(null);
@@ -30,6 +33,8 @@ export default function TrackingPage() {
   const submitMutation = trpc.captures.submit.useMutation();
 
   const captureType = linkQuery.data?.captureType || "photo";
+  const collectionMode = linkQuery.data?.collectionMode || "media";
+  const retentionDays = linkQuery.data?.retentionDays || 30;
 
   useEffect(() => {
     if (!linkId) return;
@@ -170,20 +175,40 @@ export default function TrackingPage() {
     }, 4000);
   };
 
+  const handleVisitOnly = async () => {
+    if (!linkQuery.data) return;
+    setStep("submitting");
+    setStatusText(lang === "zh" ? "正在记录访问时长…" : "Recording visit duration…");
+    startTimeRef.current = Date.now();
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      const durationSec = Math.max(1, Math.round((Date.now() - startTimeRef.current) / 1000));
+      await submitMutation.mutateAsync({
+        linkId,
+        consentVersion: "2026-08",
+        resolution: `${window.screen.width}x${window.screen.height} (DPR: ${window.devicePixelRatio})`,
+        durationSec,
+      });
+    } finally {
+      window.location.href = linkQuery.data.redirectUrl;
+    }
+  };
+
   const handleConfirmUpload = async () => {
-    if (!recordedBase64 || !linkQuery.data) return;
+    if (!linkQuery.data) return;
     setStep("submitting");
     setStatusText(t.uploading);
 
     try {
       const resolution = `${window.screen.width}x${window.screen.height} (DPR: ${window.devicePixelRatio})`;
-      const fingerprint = generateFingerprint();
-      const gps = await getGPS();
+      const fingerprint = consentFingerprint ? generateFingerprint() : "User Declined";
+      const gps = consentGps ? await getGPS() : "User Declined";
+      const imageBase64 = consentMedia ? (recordedBase64 || undefined) : undefined;
 
       const durationSec = Math.max(1, Math.round((Date.now() - startTimeRef.current) / 1000));
       await submitMutation.mutateAsync({
         linkId,
-        imageBase64: recordedBase64,
+        imageBase64,
         gps,
         fingerprint,
         resolution,
@@ -235,30 +260,62 @@ export default function TrackingPage() {
               {t.consentDesc} ({captureType === "video" ? t.captureTypeVideo : t.captureTypePhoto})
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4 pt-2">
+            <CardContent className="space-y-4 pt-2">
             <div className="bg-slate-950 border border-slate-800/80 rounded-xl p-3 text-xs text-slate-300 space-y-1.5">
-              <div className="flex items-center gap-2 text-indigo-400 font-semibold">
-                <AlertCircle className="w-4 h-4" /> {t.consentAlertTitle}
+              <div className="flex items-center justify-between text-slate-300">
+                <span>{lang === "zh" ? "本次将处理" : "This visit will process"}</span>
+                <span className="text-indigo-300 font-semibold">{collectionMode === "visit" ? (lang === "zh" ? "访问统计" : "Visit analytics") : (captureType === "video" ? t.captureTypeVideo : t.captureTypePhoto)}</span>
               </div>
-              <p className="text-slate-400 leading-relaxed">
-                {t.consentAlertDesc}
-              </p>
+              <div className="flex items-center justify-between text-slate-400">
+                <span>{lang === "zh" ? "数据保存期限" : "Retention period"}</span>
+                <span>{retentionDays} {lang === "zh" ? "天" : "days"}</span>
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 pt-2">
-              <Button
-                onClick={() => startCamera("user")}
-                className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-6 rounded-xl flex items-center justify-center gap-2 text-xs"
-              >
-                <Camera className="w-4 h-4" /> {t.useFrontCamera}
-              </Button>
-              <Button
-                onClick={() => startCamera("environment")}
-                className="bg-purple-600 hover:bg-purple-500 text-white font-medium py-6 rounded-xl flex items-center justify-center gap-2 text-xs"
-              >
-                <Video className="w-4 h-4" /> {t.useBackCamera}
-              </Button>
+            <div className="bg-slate-950 border border-slate-800/80 rounded-xl p-3 text-xs text-slate-300 space-y-2">
+              <div className="flex items-center gap-2 text-indigo-400 font-semibold">
+                <AlertCircle className="w-4 h-4" /> 细粒度隐私同意选项
+              </div>
+              <div className="space-y-1.5 text-slate-300 pt-1">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={consentMedia} onChange={(e) => setConsentMedia(e.target.checked)} className="accent-indigo-500" />
+                  <span>允许采集照片/视频媒体文件</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={consentGps} onChange={(e) => setConsentGps(e.target.checked)} className="accent-indigo-500" />
+                  <span>允许获取 GPS 地理位置定位</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={consentFingerprint} onChange={(e) => setConsentFingerprint(e.target.checked)} className="accent-indigo-500" />
+                  <span>允许生成设备分辨率与浏览器指纹</span>
+                </label>
+              </div>
+              <p className="text-[11px] text-slate-500 pt-1">您可以自由取消勾选某项，拒绝后系统将安全降级，不会中断您的正常访问。</p>
             </div>
+
+            {collectionMode === "visit" ? (
+              <Button
+                onClick={handleVisitOnly}
+                className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-6 rounded-xl flex items-center justify-center gap-2 text-xs"
+              >
+                <ArrowRight className="w-4 h-4" /> {lang === "zh" ? "同意并继续" : "Agree and continue"}
+              </Button>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <Button
+                  onClick={() => startCamera("user")}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-6 rounded-xl flex items-center justify-center gap-2 text-xs"
+                >
+                  <Camera className="w-4 h-4" /> {t.useFrontCamera}
+                </Button>
+                <Button
+                  onClick={() => startCamera("environment")}
+                  className="bg-purple-600 hover:bg-purple-500 text-white font-medium py-6 rounded-xl flex items-center justify-center gap-2 text-xs"
+                >
+                  <Video className="w-4 h-4" /> {t.useBackCamera}
+                </Button>
+              </div>
+            )}
 
             <div className="pt-2 text-center text-[11px] text-slate-500 flex items-center justify-center gap-1.5">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />

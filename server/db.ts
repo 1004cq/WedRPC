@@ -1,4 +1,4 @@
-import { eq, desc, and, inArray } from "drizzle-orm";
+import { eq, desc, and, inArray, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users, trackingLinks, captures, smtpSettings, auditLogs, InsertTrackingLink, InsertCapture, InsertSmtpSetting } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -95,7 +95,7 @@ export async function getTrackingLinkById(id: string) {
 export async function deleteTrackingLink(id: string) {
   const db = await getDb();
   if (!db) return;
-  await db.delete(captures).where(eq(captures.linkId, id));
+  await db.update(captures).set({ deletedAt: new Date() }).where(and(eq(captures.linkId, id), isNull(captures.deletedAt)));
   await db.delete(trackingLinks).where(eq(trackingLinks.id, id));
 }
 
@@ -110,29 +110,36 @@ export async function getCaptures(linkId?: string, linkIds?: string[]) {
   const db = await getDb();
   if (!db) return [];
   if (linkId) {
-    return await db.select().from(captures).where(eq(captures.linkId, linkId)).orderBy(desc(captures.createdAt));
+    return await db.select().from(captures).where(and(eq(captures.linkId, linkId), isNull(captures.deletedAt))).orderBy(desc(captures.createdAt));
   }
   if (linkIds && linkIds.length > 0) {
-    return await db.select().from(captures).where(inArray(captures.linkId, linkIds)).orderBy(desc(captures.createdAt));
+    return await db.select().from(captures).where(and(inArray(captures.linkId, linkIds), isNull(captures.deletedAt))).orderBy(desc(captures.createdAt));
   }
-  return await db.select().from(captures).orderBy(desc(captures.createdAt));
+  return await db.select().from(captures).where(isNull(captures.deletedAt)).orderBy(desc(captures.createdAt));
+}
+
+export async function getCaptureById(id: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(captures).where(and(eq(captures.id, id), isNull(captures.deletedAt))).limit(1);
+  return result.length > 0 ? result[0] : undefined;
 }
 
 export async function deleteCapture(id: string) {
   const db = await getDb();
   if (!db) return;
-  await db.delete(captures).where(eq(captures.id, id));
+  await db.update(captures).set({ deletedAt: new Date() }).where(and(eq(captures.id, id), isNull(captures.deletedAt)));
 }
 
 export async function clearCaptures(linkId?: string, linkIds?: string[]) {
   const db = await getDb();
   if (!db) return;
   if (linkId) {
-    await db.delete(captures).where(eq(captures.linkId, linkId));
+    await db.update(captures).set({ deletedAt: new Date() }).where(and(eq(captures.linkId, linkId), isNull(captures.deletedAt)));
   } else if (linkIds && linkIds.length > 0) {
-    await db.delete(captures).where(inArray(captures.linkId, linkIds));
+    await db.update(captures).set({ deletedAt: new Date() }).where(and(inArray(captures.linkId, linkIds), isNull(captures.deletedAt)));
   } else {
-    await db.delete(captures);
+    await db.update(captures).set({ deletedAt: new Date() }).where(isNull(captures.deletedAt));
   }
 }
 
@@ -156,6 +163,10 @@ export async function upsertSmtpSetting(data: InsertSmtpSetting) {
       recipient: data.recipient,
       emailSubjectTemplate: data.emailSubjectTemplate,
       emailHtmlTemplate: data.emailHtmlTemplate,
+      webhookUrl: data.webhookUrl,
+      webhookType: data.webhookType,
+      webhookTemplate: data.webhookTemplate,
+      webhookAlertLevel: data.webhookAlertLevel,
     },
   });
 }

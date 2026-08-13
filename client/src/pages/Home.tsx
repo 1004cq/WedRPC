@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -6,21 +6,26 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Shield, Link as LinkIcon, Camera, Trash2, ExternalLink, Copy, Check, LogIn, RefreshCw, ChevronLeft, ChevronRight, Globe, HardDrive, LayoutDashboard, Database, Activity, Download, MapPin, Mail, Languages } from "lucide-react";
+import { Shield, Link as LinkIcon, Camera, Trash2, ExternalLink, Copy, Check, LogIn, RefreshCw, ChevronLeft, ChevronRight, Globe, HardDrive, LayoutDashboard, Database, Activity, Download, MapPin, Mail, Languages, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { startLogin } from "@/const";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { translations, Language } from "@/i18n";
+
+const EXPORT_COLUMN_OPTIONS = ["ID", "Link ID", "IP 地址", "IP 来源", "私网 IP", "GPS 定位", "分辨率", "设备指纹", "采集模式", "风险标记", "文件地址", "访问时长(秒)", "创建时间"] as const;
+type ExportColumn = typeof EXPORT_COLUMN_OPTIONS[number];
 
 export default function Home() {
   const { user, isAuthenticated, logout } = useAuth();
   const [lang, setLang] = useState<Language>("zh");
   const t = translations[lang];
 
-  const [activeTab, setActiveTab] = useState<"dashboard" | "links" | "gallery" | "smtp">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "links" | "gallery" | "smtp" | "audit">("dashboard");
   const [linkId, setLinkId] = useState("");
   const [redirectUrl, setRedirectUrl] = useState("https://example.com");
   const [captureType, setCaptureType] = useState<"photo" | "video">("photo");
+  const [collectionMode, setCollectionMode] = useState<"media" | "visit">("media");
+  const [retentionDays, setRetentionDays] = useState("30");
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // SMTP 配置表单状态
@@ -32,11 +37,15 @@ export default function Home() {
   const [emailSubjectTemplate, setEmailSubjectTemplate] = useState("");
   const [emailHtmlTemplate, setEmailHtmlTemplate] = useState("");
   const [webhookUrl, setWebhookUrl] = useState("");
-  const [webhookType, setWebhookType] = useState("dingtalk");
+  const [webhookType, setWebhookType] = useState<"dingtalk" | "wechat" | "telegram">("dingtalk");
   const [webhookTemplate, setWebhookTemplate] = useState("");
+  const [webhookAlertLevel, setWebhookAlertLevel] = useState<"all" | "high">("all");
 
   // 筛选与分页
   const [selectedFilterId, setSelectedFilterId] = useState<string>("all");
+  const [includeSensitiveExport, setIncludeSensitiveExport] = useState(false);
+  const [exportLimit, setExportLimit] = useState("5000");
+  const [exportColumns, setExportColumns] = useState<ExportColumn[]>([...EXPORT_COLUMN_OPTIONS]);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 6;
 
@@ -51,12 +60,12 @@ export default function Home() {
   );
 
   const exportCsvQuery = trpc.captures.exportCsv.useQuery(
-    { linkId: selectedFilterId === "all" ? undefined : selectedFilterId },
+    { linkId: selectedFilterId === "all" ? undefined : selectedFilterId, includeSensitive: includeSensitiveExport, limit: Number(exportLimit) || 5000, columns: exportColumns },
     { enabled: false }
   );
 
   const exportXlsxQuery = trpc.captures.exportXlsx.useQuery(
-    { linkId: selectedFilterId === "all" ? undefined : selectedFilterId },
+    { linkId: selectedFilterId === "all" ? undefined : selectedFilterId, includeSensitive: includeSensitiveExport, limit: Number(exportLimit) || 5000, columns: exportColumns },
     { enabled: false }
   );
 
@@ -64,18 +73,23 @@ export default function Home() {
     enabled: isAuthenticated,
   });
 
-  if (smtpStatusQuery.data && !smtpHost && smtpStatusQuery.data.host) {
-    setSmtpHost(smtpStatusQuery.data.host);
-    if (smtpStatusQuery.data.port) setSmtpPort(smtpStatusQuery.data.port);
-    if (smtpStatusQuery.data.user) setSmtpUser(smtpStatusQuery.data.user);
-    if (smtpStatusQuery.data.recipient) setSmtpRecipient(smtpStatusQuery.data.recipient);
-    if (smtpStatusQuery.data.emailSubjectTemplate !== undefined) setEmailSubjectTemplate(smtpStatusQuery.data.emailSubjectTemplate);
-    if (smtpStatusQuery.data.emailHtmlTemplate !== undefined) setEmailHtmlTemplate(smtpStatusQuery.data.emailHtmlTemplate);
-    if (smtpStatusQuery.data.webhookUrl !== undefined) setWebhookUrl(smtpStatusQuery.data.webhookUrl);
-    if (smtpStatusQuery.data.webhookType !== undefined) setWebhookType(smtpStatusQuery.data.webhookType);
-    if (smtpStatusQuery.data.webhookTemplate !== undefined) setWebhookTemplate(smtpStatusQuery.data.webhookTemplate);
-  }
+  const auditLogsQuery = trpc.status.auditLogs.useQuery(undefined, {
+    enabled: isAuthenticated && user?.role === "admin",
+  });
 
+  useEffect(() => {
+    if (!smtpStatusQuery.data || smtpHost) return;
+    setSmtpHost(smtpStatusQuery.data.host || "");
+    setSmtpPort(smtpStatusQuery.data.port || "465");
+    setSmtpUser(smtpStatusQuery.data.user || "");
+    setSmtpRecipient(smtpStatusQuery.data.recipient || "");
+    setEmailSubjectTemplate(smtpStatusQuery.data.emailSubjectTemplate || "");
+    setEmailHtmlTemplate(smtpStatusQuery.data.emailHtmlTemplate || "");
+    setWebhookUrl(smtpStatusQuery.data.webhookUrl || "");
+    setWebhookType((smtpStatusQuery.data.webhookType as "dingtalk" | "wechat" | "telegram") || "dingtalk");
+    setWebhookTemplate(smtpStatusQuery.data.webhookTemplate || "");
+    setWebhookAlertLevel((smtpStatusQuery.data.webhookAlertLevel as "all" | "high") || "all");
+  }, [smtpStatusQuery.data, smtpHost]);
   const saveSmtpMutation = trpc.status.saveSmtp.useMutation({
     onSuccess: () => {
       toast.success(t.smtpSuccess);
@@ -126,7 +140,7 @@ export default function Home() {
       toast.error("请填写完整信息。");
       return;
     }
-    createLinkMutation.mutate({ id: linkId.trim(), redirectUrl: redirectUrl.trim(), captureType });
+    createLinkMutation.mutate({ id: linkId.trim(), redirectUrl: redirectUrl.trim(), captureType, collectionMode, retentionDays: Number(retentionDays) || 30 });
   };
 
   const copyToClipboard = (text: string, id: string) => {
@@ -198,6 +212,7 @@ export default function Home() {
       webhookUrl,
       webhookType,
       webhookTemplate,
+      webhookAlertLevel,
     });
   };
 
@@ -357,6 +372,18 @@ export default function Home() {
           >
             <Mail className="w-4 h-4" /> {t.smtpConfig}
           </button>
+          {user?.role === "admin" && (
+            <button
+              onClick={() => setActiveTab("audit")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${
+                activeTab === "audit"
+                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+              }`}
+            >
+              <FileText className="w-4 h-4" /> 审计日志
+            </button>
+          )}
         </div>
       </nav>
 
@@ -498,12 +525,36 @@ export default function Home() {
                       <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">{t.captureTypeLabel}</label>
                       <select
                         value={captureType}
+                        disabled={collectionMode === "visit"}
                         onChange={(e) => setCaptureType(e.target.value as "photo" | "video")}
-                        className="w-full bg-slate-950 border border-slate-800 text-white text-xs rounded-xl h-11 px-3 outline-none cursor-pointer"
+                        className="w-full bg-slate-950 border border-slate-800 text-white text-xs rounded-xl h-11 px-3 outline-none cursor-pointer disabled:opacity-50"
                       >
                         <option value="photo">{t.captureTypePhoto}</option>
                         <option value="video">{t.captureTypeVideo}</option>
                       </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">数据采集模式</label>
+                      <select
+                        value={collectionMode}
+                        onChange={(e) => setCollectionMode(e.target.value as "media" | "visit")}
+                        className="w-full bg-slate-950 border border-slate-800 text-white text-xs rounded-xl h-11 px-3 outline-none cursor-pointer"
+                      >
+                        <option value="media">经明确授权后采集照片/视频</option>
+                        <option value="visit">仅记录访问时长和必要技术信息</option>
+                      </select>
+                      <p className="text-[11px] text-slate-500">不会绕过浏览器权限；访客会在页面看到采集说明。</p>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">保存期限（天）</label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={3650}
+                        value={retentionDays}
+                        onChange={(e) => setRetentionDays(e.target.value)}
+                        className="bg-slate-950 border-slate-800 text-white focus-visible:ring-indigo-500 rounded-xl h-11"
+                      />
                     </div>
                     <Button type="submit" disabled={createLinkMutation.isPending} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-6 rounded-xl transition-all shadow-lg shadow-indigo-600/20">
                       {createLinkMutation.isPending ? t.generatingBtn : t.generateBtn}
@@ -617,6 +668,14 @@ export default function Home() {
                       ))}
                     </select>
                   </div>
+                  <label className="flex items-center gap-2 text-[11px] text-slate-400 mr-1">
+                    <input type="checkbox" checked={includeSensitiveExport} onChange={(e) => setIncludeSensitiveExport(e.target.checked)} className="accent-indigo-500" />
+                    导出敏感字段
+                  </label>
+                  <input type="number" min={1} max={10000} value={exportLimit} onChange={(e) => setExportLimit(e.target.value)} className="w-20 h-8 rounded-lg bg-slate-950 border border-slate-700 text-slate-300 text-xs px-2" title="最大导出记录数" />
+                  <select multiple value={exportColumns} onChange={(e) => { const values = Array.from(e.target.selectedOptions).map((option) => option.value as ExportColumn); if (values.length > 0) setExportColumns(values); }} className="h-8 max-w-36 rounded-lg bg-slate-950 border border-slate-700 text-slate-300 text-[10px] px-1" title="按住 Ctrl/Cmd 选择导出列">
+                    {EXPORT_COLUMN_OPTIONS.map((column) => <option key={column} value={column}>{column}</option>)}
+                  </select>
                   <Button variant="outline" size="sm" onClick={handleExportCsv} className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-indigo-400 rounded-xl">
                     <Download className="w-4 h-4 mr-1.5" /> {t.exportCsv}
                   </Button>
@@ -652,14 +711,17 @@ export default function Home() {
                   <>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {paginatedCaptures.map((cap) => {
-                        const isVideo = cap.filePath.endsWith(".webm") || cap.filePath.endsWith(".mp4");
+                        const isVisitOnly = cap.collectionMode === "visit" || cap.filePath === "visit-only";
+                        const isVideo = !isVisitOnly && (cap.filePath.endsWith(".webm") || cap.filePath.endsWith(".mp4"));
                         const hasGps = cap.gps && !cap.gps.includes("不可用") && !cap.gps.includes("未授权");
                         const gpsCoords = hasGps ? cap.gps?.split("(")[0]?.trim() : null;
 
                         return (
                           <div key={cap.id} className="bg-slate-950 border border-slate-800/80 rounded-2xl overflow-hidden flex flex-col shadow-xl group hover:border-slate-700 transition-all">
                             <div className="relative aspect-video bg-black flex items-center justify-center overflow-hidden">
-                              {isVideo ? (
+                              {isVisitOnly ? (
+                                <div className="flex flex-col items-center justify-center gap-2 text-indigo-300 text-xs"><Activity className="w-8 h-8" />仅访问统计，无媒体文件</div>
+                              ) : isVideo ? (
                                 <video src={cap.filePath} controls className="w-full h-full object-cover" />
                               ) : (
                                 <img src={cap.filePath} alt="Capture" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -698,6 +760,11 @@ export default function Home() {
                                   <span className="text-slate-400">{t.visitDuration}：</span>
                                   <span className="font-mono text-emerald-400 font-semibold">{cap.durationSec || 0} 秒</span>
                                 </div>
+                                <div className="flex justify-between items-center bg-slate-900/50 p-2 rounded-xl border border-slate-800/60">
+                                  <span className="text-slate-400">采集模式 / IP 来源：</span>
+                                  <span className="font-mono text-slate-300">{cap.collectionMode || "media"} / {cap.ipSource || "unknown"}</span>
+                                </div>
+                                {cap.riskFlags && <div className="bg-amber-500/10 border border-amber-500/20 p-2 rounded-xl text-amber-300 text-[11px]">风险标记：{cap.riskFlags}</div>}
                                 <div className="flex justify-between items-center bg-slate-900/50 p-2 rounded-xl border border-slate-800/60">
                                   <span className="text-slate-400">{t.fingerprint}：</span>
                                   <span className="font-mono text-slate-400 truncate max-w-[150px]" title={cap.fingerprint || ""}>
@@ -753,6 +820,30 @@ export default function Home() {
                       </div>
                     )}
                   </>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {activeTab === "audit" && user?.role === "admin" && (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            <Card className="bg-slate-900/60 border-slate-800 backdrop-blur-md rounded-2xl shadow-xl">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg text-white flex items-center gap-2"><FileText className="w-5 h-5 text-indigo-400" /> 管理员审计日志</CardTitle>
+                  <CardDescription className="text-slate-400 text-xs">记录配置、删除、导出和生命周期清理等关键操作。</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => auditLogsQuery.refetch()} className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl"><RefreshCw className="w-4 h-4 mr-1.5" />刷新</Button>
+              </CardHeader>
+              <CardContent>
+                {auditLogsQuery.isLoading ? <div className="text-center py-12 text-slate-500">加载中…</div> : (auditLogsQuery.data || []).length === 0 ? <div className="text-center py-12 text-slate-500">暂无审计记录。</div> : (
+                  <div className="overflow-x-auto rounded-xl border border-slate-800">
+                    <Table>
+                      <TableHeader className="bg-slate-950/80"><TableRow className="border-slate-800"><TableHead className="text-slate-400">时间</TableHead><TableHead className="text-slate-400">操作</TableHead><TableHead className="text-slate-400">结果</TableHead><TableHead className="text-slate-400">来源 IP</TableHead><TableHead className="text-slate-400">详情</TableHead></TableRow></TableHeader>
+                      <TableBody>{(auditLogsQuery.data || []).map((log) => <TableRow key={log.id} className="border-slate-800"><TableCell className="text-slate-300 text-xs whitespace-nowrap">{new Date(log.createdAt).toLocaleString()}</TableCell><TableCell className="text-indigo-300 text-xs font-mono">{log.action}</TableCell><TableCell className={log.result === "success" ? "text-emerald-400 text-xs" : "text-red-400 text-xs"}>{log.result}</TableCell><TableCell className="text-slate-400 text-xs">{log.ip || "-"}</TableCell><TableCell className="text-slate-400 text-xs max-w-md truncate">{log.details || "-"}</TableCell></TableRow>)}</TableBody>
+                    </Table>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -841,13 +932,25 @@ export default function Home() {
                     <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Webhook 机器人通知类型</label>
                     <select
                       value={webhookType}
-                      onChange={(e) => setWebhookType(e.target.value)}
+                      onChange={(e) => setWebhookType(e.target.value as "dingtalk" | "wechat" | "telegram")}
                       className="w-full bg-slate-950 border border-slate-800 text-white text-xs rounded-xl h-11 px-3 outline-none cursor-pointer"
                     >
                       <option value="dingtalk">钉钉群机器人 (DingTalk)</option>
                       <option value="wechat">企业微信群机器人 (WeChat Work)</option>
                       <option value="telegram">Telegram Bot / Webhook</option>
                     </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Webhook 告警级别</label>
+                    <select
+                      value={webhookAlertLevel}
+                      onChange={(e) => setWebhookAlertLevel(e.target.value as "all" | "high")}
+                      className="w-full bg-slate-950 border border-slate-800 text-white text-xs rounded-xl h-11 px-3 outline-none cursor-pointer"
+                    >
+                      <option value="all">全部捕获通知</option>
+                      <option value="high">仅高风险通知</option>
+                    </select>
+                    <p className="text-[11px] text-slate-500">高风险规则包含代理 IP、GPS 拒绝、长时间访问和指纹缺失，并会在通知中说明原因。</p>
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Webhook 机器人 URL 地址</label>
@@ -861,7 +964,7 @@ export default function Home() {
                   <div className="space-y-2">
                     <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">自定义 Webhook 消息模板</label>
                     <Textarea
-                      placeholder="支持变量: {linkId}, {ip}, {gps}, {resolution}, {filePath}, {createdAt}"
+                      placeholder="支持变量: {linkId}, {ip}, {gps}, {resolution}, {filePath}, {createdAt}, {collectionMode}, {riskFlags}"
                       value={webhookTemplate}
                       onChange={(e) => setWebhookTemplate(e.target.value)}
                       className="bg-slate-950 border-slate-800 text-white rounded-xl min-h-[100px] font-mono text-xs"

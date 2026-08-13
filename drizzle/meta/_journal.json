@@ -57,6 +57,34 @@
       "when": 1786587211985,
       "tag": "0007_wooden_cerebro",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1786587780213,
+      "tag": "0008_daily_vampiro",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1786588045145,
+      "tag": "0009_brave_penance",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1786588460140,
+      "tag": "0010_aspiring_santa_claus",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1786588678691,
+      "tag": "0011_hard_blob",
+      "breakpoints": true
     }
   ]
 }

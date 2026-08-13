@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { boolean, int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -9,7 +9,7 @@ export const users = mysqlTable("users", {
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  role: mysqlEnum("role", ["user", "admin", "auditor", "operator", "viewer"]).default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -23,6 +23,8 @@ export const trackingLinks = mysqlTable("trackingLinks", {
   redirectUrl: text("redirectUrl").notNull(),
   userId: int("userId"),
   captureType: varchar("captureType", { length: 32 }).default("photo").notNull(),
+  collectionMode: varchar("collectionMode", { length: 32 }).default("media").notNull(),
+  retentionDays: int("retentionDays").default(30).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -30,12 +32,19 @@ export const captures = mysqlTable("captures", {
   id: varchar("id", { length: 64 }).primaryKey(),
   linkId: varchar("linkId", { length: 64 }).notNull(),
   ip: varchar("ip", { length: 128 }),
+  ipSource: varchar("ipSource", { length: 32 }),
+  isPrivateIp: boolean("isPrivateIp").default(false).notNull(),
   gps: varchar("gps", { length: 128 }),
   fingerprint: text("fingerprint"),
   resolution: varchar("resolution", { length: 64 }),
   userAgent: text("userAgent"),
   filePath: text("filePath").notNull(),
   durationSec: int("durationSec").default(0).notNull(),
+  consentVersion: varchar("consentVersion", { length: 32 }).default("2026-08").notNull(),
+  consentAt: timestamp("consentAt"),
+  collectionMode: varchar("collectionMode", { length: 32 }).default("media").notNull(),
+  riskFlags: text("riskFlags"),
+  deletedAt: timestamp("deletedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -61,7 +70,12 @@ export const auditLogs = mysqlTable("auditLogs", {
   userId: int("userId"),
   action: varchar("action", { length: 128 }).notNull(),
   details: text("details"),
+  targetType: varchar("targetType", { length: 64 }),
+  targetId: varchar("targetId", { length: 128 }),
+  result: varchar("result", { length: 32 }).default("success").notNull(),
   ip: varchar("ip", { length: 128 }),
+  userAgent: text("userAgent"),
+  integrityHash: varchar("integrityHash", { length: 128 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

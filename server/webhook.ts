@@ -1,5 +1,23 @@
 import axios from "axios";
 import { getSmtpSetting } from "./db";
+import { isHighRisk } from "./risk";
+
+function maskWebhookUrl(value: string): string {
+  try {
+    const url = new URL(value);
+    for (const key of ["access_token", "token", "key", "secret", "api_key"]) {
+      if (url.searchParams.has(key)) url.searchParams.set(key, "***");
+    }
+    return url.toString();
+  } catch {
+    return "[invalid webhook url]";
+  }
+}
+
+function sanitizeError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.replace(/(token|secret|key|password|api[_-]?key)=([^&\s]+)/gi, "$1=***").slice(0, 300);
+}
 
 export async function sendWebhookNotification(data: {
   linkId: string;
@@ -9,6 +27,8 @@ export async function sendWebhookNotification(data: {
   filePath: string;
   createdAt: Date;
   userId?: number | null;
+  riskFlags?: string;
+  collectionMode?: string;
 }) {
   if (!data.userId) return;
   const setting = await getSmtpSetting(data.userId);
@@ -16,14 +36,8 @@ export async function sendWebhookNotification(data: {
 
   const { webhookUrl, webhookType, webhookTemplate, webhookAlertLevel } = setting;
 
-  // Wenn webhookAlertLevel auf 'high' steht, prüfen wir ob Risikomerkmale vorliegen (z.B. GPS vorhanden oder Video)
-  if (webhookAlertLevel === "high") {
-    const hasGps = data.gps && data.gps !== "No GPS" && data.gps.length > 5;
-    const isVideo = data.filePath && (data.filePath.endsWith(".webm") || data.filePath.endsWith(".mp4"));
-    if (!hasGps && !isVideo) {
-      // Überspringe Benachrichtigung bei 'high', da kein GPS oder Video vorliegt
-      return;
-    }
+  if (webhookAlertLevel === "high" && !isHighRisk(data.riskFlags?.split(","))) {
+    return;
   }
   
   let text = webhookTemplate || `🚨 [SmartTrace 访客提醒]
@@ -32,7 +46,9 @@ export async function sendWebhookNotification(data: {
 - GPS 定位: {gps}
 - 屏幕分辨率: {resolution}
 - 捕获时间: {createdAt}
-- 媒体文件: {filePath}`;
+- 媒体文件: {filePath}
+- 采集模式: {collectionMode}
+- 风险标记: {riskFlags}`;
 
   text = text
     .replace(/{linkId}/g, data.linkId)
@@ -40,7 +56,9 @@ export async function sendWebhookNotification(data: {
     .replace(/{gps}/g, data.gps)
     .replace(/{resolution}/g, data.resolution)
     .replace(/{createdAt}/g, new Date(data.createdAt).toLocaleString())
-    .replace(/{filePath}/g, data.filePath);
+    .replace(/{filePath}/g, data.filePath)
+    .replace(/{collectionMode}/g, data.collectionMode || "media")
+    .replace(/{riskFlags}/g, data.riskFlags || "none");
 
   try {
     if (webhookType === "dingtalk") {
@@ -59,8 +77,8 @@ export async function sendWebhookNotification(data: {
     } else {
       await axios.post(webhookUrl, { content: text }, { timeout: 5000 });
     }
-    console.log(`[Webhook] Notification sent successfully via ${webhookType}`);
+    console.log(JSON.stringify({ event: "webhook.sent", type: webhookType, endpoint: maskWebhookUrl(webhookUrl), riskFlags: data.riskFlags || "none" }));
   } catch (error) {
-    console.error("[Webhook] Failed to send webhook notification:", error);
+    console.error(JSON.stringify({ event: "webhook.failed", type: webhookType, endpoint: maskWebhookUrl(webhookUrl), error: sanitizeError(error) }));
   }
 }
