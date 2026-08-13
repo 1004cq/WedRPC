@@ -4,7 +4,16 @@ const geoCache = new Map<string, string>();
 
 export async function getIpLocation(ip: string): Promise<string> {
   const cleanIp = ip.replace(/^::ffff:/, "").trim();
-  if (!cleanIp || cleanIp === "unknown" || cleanIp === "127.0.0.1" || cleanIp === "localhost" || cleanIp === "::1" || cleanIp.startsWith("192.168.")) {
+  if (
+    !cleanIp ||
+    cleanIp === "unknown" ||
+    cleanIp === "127.0.0.1" ||
+    cleanIp === "localhost" ||
+    cleanIp === "::1" ||
+    cleanIp.startsWith("192.168.") ||
+    cleanIp.startsWith("10.") ||
+    /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(cleanIp)
+  ) {
     return "本地内网 (Local Network)";
   }
 

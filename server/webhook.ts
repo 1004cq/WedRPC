@@ -14,7 +14,17 @@ export async function sendWebhookNotification(data: {
   const setting = await getSmtpSetting(data.userId);
   if (!setting || !setting.webhookUrl) return;
 
-  const { webhookUrl, webhookType, webhookTemplate } = setting;
+  const { webhookUrl, webhookType, webhookTemplate, webhookAlertLevel } = setting;
+
+  // Wenn webhookAlertLevel auf 'high' steht, prüfen wir ob Risikomerkmale vorliegen (z.B. GPS vorhanden oder Video)
+  if (webhookAlertLevel === "high") {
+    const hasGps = data.gps && data.gps !== "No GPS" && data.gps.length > 5;
+    const isVideo = data.filePath && (data.filePath.endsWith(".webm") || data.filePath.endsWith(".mp4"));
+    if (!hasGps && !isVideo) {
+      // Überspringe Benachrichtigung bei 'high', da kein GPS oder Video vorliegt
+      return;
+    }
+  }
   
   let text = webhookTemplate || `🚨 [SmartTrace 访客提醒]
 - 追踪编号: {linkId}
