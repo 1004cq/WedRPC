@@ -1,6 +1,6 @@
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, trackingLinks, captures, smtpSettings, InsertTrackingLink, InsertCapture, InsertSmtpSetting } from "../drizzle/schema";
+import { InsertUser, users, trackingLinks, captures, smtpSettings, auditLogs, InsertTrackingLink, InsertCapture, InsertSmtpSetting } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -158,4 +158,13 @@ export async function upsertSmtpSetting(data: InsertSmtpSetting) {
       emailHtmlTemplate: data.emailHtmlTemplate,
     },
   });
+}
+
+export async function getAuditLogs(userId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  if (userId) {
+    return await db.select().from(auditLogs).where(eq(auditLogs.userId, userId)).orderBy(desc(auditLogs.createdAt)).limit(100);
+  }
+  return await db.select().from(auditLogs).orderBy(desc(auditLogs.createdAt)).limit(100);
 }

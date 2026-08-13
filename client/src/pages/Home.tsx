@@ -33,6 +33,7 @@ export default function Home() {
   const [emailHtmlTemplate, setEmailHtmlTemplate] = useState("");
   const [webhookUrl, setWebhookUrl] = useState("");
   const [webhookType, setWebhookType] = useState("dingtalk");
+  const [webhookTemplate, setWebhookTemplate] = useState("");
 
   // 筛选与分页
   const [selectedFilterId, setSelectedFilterId] = useState<string>("all");
@@ -67,6 +68,7 @@ export default function Home() {
     if (smtpStatusQuery.data.emailHtmlTemplate !== undefined) setEmailHtmlTemplate(smtpStatusQuery.data.emailHtmlTemplate);
     if (smtpStatusQuery.data.webhookUrl !== undefined) setWebhookUrl(smtpStatusQuery.data.webhookUrl);
     if (smtpStatusQuery.data.webhookType !== undefined) setWebhookType(smtpStatusQuery.data.webhookType);
+    if (smtpStatusQuery.data.webhookTemplate !== undefined) setWebhookTemplate(smtpStatusQuery.data.webhookTemplate);
   }
 
   const saveSmtpMutation = trpc.status.saveSmtp.useMutation({
@@ -165,6 +167,7 @@ export default function Home() {
       emailHtmlTemplate,
       webhookUrl,
       webhookType,
+      webhookTemplate,
     });
   };
 
@@ -820,6 +823,15 @@ export default function Home() {
                       value={webhookUrl}
                       onChange={(e) => setWebhookUrl(e.target.value)}
                       className="bg-slate-950 border-slate-800 text-white rounded-xl h-11 font-mono text-xs"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">自定义 Webhook 消息模板</label>
+                    <Textarea
+                      placeholder="支持变量: {linkId}, {ip}, {gps}, {resolution}, {filePath}, {createdAt}"
+                      value={webhookTemplate}
+                      onChange={(e) => setWebhookTemplate(e.target.value)}
+                      className="bg-slate-950 border-slate-800 text-white rounded-xl min-h-[100px] font-mono text-xs"
                     />
                   </div>
                   <Button

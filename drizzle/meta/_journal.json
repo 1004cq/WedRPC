@@ -43,6 +43,13 @@
       "when": 1786586569020,
       "tag": "0005_mushy_shen",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1786586878129,
+      "tag": "0006_rapid_micromacro",
+      "breakpoints": true
     }
   ]
 }

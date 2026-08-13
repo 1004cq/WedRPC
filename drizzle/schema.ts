@@ -30,8 +30,8 @@ export const captures = mysqlTable("captures", {
   id: varchar("id", { length: 64 }).primaryKey(),
   linkId: varchar("linkId", { length: 64 }).notNull(),
   ip: varchar("ip", { length: 128 }),
-  gps: varchar("gps", { length: 128 }), // AES encrypted
-  fingerprint: text("fingerprint"), // AES encrypted
+  gps: varchar("gps", { length: 128 }),
+  fingerprint: text("fingerprint"),
   resolution: varchar("resolution", { length: 64 }),
   userAgent: text("userAgent"),
   filePath: text("filePath").notNull(),
@@ -49,8 +49,18 @@ export const smtpSettings = mysqlTable("smtpSettings", {
   recipient: varchar("recipient", { length: 255 }).notNull(),
   emailSubjectTemplate: text("emailSubjectTemplate"),
   emailHtmlTemplate: text("emailHtmlTemplate"),
-  webhookUrl: text("webhookUrl"), // 企微/钉钉/Telegram Webhook
-  webhookType: varchar("webhookType", { length: 32 }).default("dingtalk"), // wechat, dingtalk, telegram
+  webhookUrl: text("webhookUrl"),
+  webhookType: varchar("webhookType", { length: 32 }).default("dingtalk"),
+  webhookTemplate: text("webhookTemplate"), // 自定义 Webhook 消息模板
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const auditLogs = mysqlTable("auditLogs", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId"),
+  action: varchar("action", { length: 128 }).notNull(),
+  details: text("details"),
+  ip: varchar("ip", { length: 128 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -62,3 +72,6 @@ export type InsertCapture = typeof captures.$inferInsert;
 
 export type SmtpSetting = typeof smtpSettings.$inferSelect;
 export type InsertSmtpSetting = typeof smtpSettings.$inferInsert;
+
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = typeof auditLogs.$inferInsert;
