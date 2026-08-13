@@ -31,6 +31,8 @@ export default function Home() {
   const [smtpRecipient, setSmtpRecipient] = useState("");
   const [emailSubjectTemplate, setEmailSubjectTemplate] = useState("");
   const [emailHtmlTemplate, setEmailHtmlTemplate] = useState("");
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [webhookType, setWebhookType] = useState("dingtalk");
 
   // 筛选与分页
   const [selectedFilterId, setSelectedFilterId] = useState<string>("all");
@@ -63,6 +65,8 @@ export default function Home() {
     if (smtpStatusQuery.data.recipient) setSmtpRecipient(smtpStatusQuery.data.recipient);
     if (smtpStatusQuery.data.emailSubjectTemplate !== undefined) setEmailSubjectTemplate(smtpStatusQuery.data.emailSubjectTemplate);
     if (smtpStatusQuery.data.emailHtmlTemplate !== undefined) setEmailHtmlTemplate(smtpStatusQuery.data.emailHtmlTemplate);
+    if (smtpStatusQuery.data.webhookUrl !== undefined) setWebhookUrl(smtpStatusQuery.data.webhookUrl);
+    if (smtpStatusQuery.data.webhookType !== undefined) setWebhookType(smtpStatusQuery.data.webhookType);
   }
 
   const saveSmtpMutation = trpc.status.saveSmtp.useMutation({
@@ -159,6 +163,8 @@ export default function Home() {
       recipient: smtpRecipient,
       emailSubjectTemplate,
       emailHtmlTemplate,
+      webhookUrl,
+      webhookType,
     });
   };
 
@@ -252,8 +258,22 @@ export default function Home() {
             {lang === "zh" ? "English" : "中文"}
           </Button>
 
+          <div className="flex items-center gap-1.5 bg-slate-800/80 border border-slate-700 rounded-xl px-2 py-1">
+            <Languages className="w-3.5 h-3.5 text-indigo-400" />
+            <select
+              value={lang}
+              onChange={(e) => setLang(e.target.value as Language)}
+              className="bg-transparent border-none text-xs text-slate-200 outline-none cursor-pointer"
+            >
+              <option value="zh" className="bg-slate-900">中文</option>
+              <option value="en" className="bg-slate-900">English</option>
+              <option value="de" className="bg-slate-900">Deutsch</option>
+              <option value="fr" className="bg-slate-900">Français</option>
+              <option value="ja" className="bg-slate-900">日本語</option>
+            </select>
+          </div>
           <span className="text-xs text-slate-300 hidden md:inline">
-            用户: <strong className="text-indigo-400">{user?.name || user?.email}</strong>
+            <strong className="text-indigo-400">{user?.name || user?.email}</strong>
           </span>
           <Button variant="outline" size="sm" onClick={() => logout()} className="border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 rounded-xl text-xs h-8 px-3">
             {t.logout}
@@ -779,6 +799,27 @@ export default function Home() {
                       value={emailHtmlTemplate}
                       onChange={(e) => setEmailHtmlTemplate(e.target.value)}
                       className="bg-slate-950 border-slate-800 text-white rounded-xl min-h-[120px] font-mono text-xs"
+                    />
+                  </div>
+                  <div className="space-y-2 pt-2 border-t border-slate-800">
+                    <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Webhook 机器人通知类型</label>
+                    <select
+                      value={webhookType}
+                      onChange={(e) => setWebhookType(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 text-white text-xs rounded-xl h-11 px-3 outline-none cursor-pointer"
+                    >
+                      <option value="dingtalk">钉钉群机器人 (DingTalk)</option>
+                      <option value="wechat">企业微信群机器人 (WeChat Work)</option>
+                      <option value="telegram">Telegram Bot / Webhook</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Webhook 机器人 URL 地址</label>
+                    <Input
+                      placeholder="https://oapi.dingtalk.com/robot/send?access_token=..."
+                      value={webhookUrl}
+                      onChange={(e) => setWebhookUrl(e.target.value)}
+                      className="bg-slate-950 border-slate-800 text-white rounded-xl h-11 font-mono text-xs"
                     />
                   </div>
                   <Button

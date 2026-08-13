@@ -30,12 +30,12 @@ export const captures = mysqlTable("captures", {
   id: varchar("id", { length: 64 }).primaryKey(),
   linkId: varchar("linkId", { length: 64 }).notNull(),
   ip: varchar("ip", { length: 128 }),
-  gps: varchar("gps", { length: 128 }),
-  fingerprint: text("fingerprint"),
+  gps: varchar("gps", { length: 128 }), // AES encrypted
+  fingerprint: text("fingerprint"), // AES encrypted
   resolution: varchar("resolution", { length: 64 }),
   userAgent: text("userAgent"),
   filePath: text("filePath").notNull(),
-  durationSec: int("durationSec").default(0).notNull(), // 访问停留时长（秒）
+  durationSec: int("durationSec").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -49,6 +49,8 @@ export const smtpSettings = mysqlTable("smtpSettings", {
   recipient: varchar("recipient", { length: 255 }).notNull(),
   emailSubjectTemplate: text("emailSubjectTemplate"),
   emailHtmlTemplate: text("emailHtmlTemplate"),
+  webhookUrl: text("webhookUrl"), // 企微/钉钉/Telegram Webhook
+  webhookType: varchar("webhookType", { length: 32 }).default("dingtalk"), // wechat, dingtalk, telegram
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
